@@ -19,7 +19,7 @@
  */
 
 @theme inline {
-  --font-sans: var(--font-sans);
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --shadow-card: var(--shadow-card);
   --radius-sm: calc(var(--radius) - 4px);
 
@@ -98,8 +98,6 @@
   --sidebar-accent-foreground: oklch(0.21 0.034 264.665);
   --sidebar-border: oklch(0.914 0.004 286.32);
   --sidebar-ring: oklch(0.546 0.215 262.881);
-  --font-sans:
-    "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --shadow-card: 0 1px 2px oklch(0.21 0.034 264.665 / 0.06);
 }
 
