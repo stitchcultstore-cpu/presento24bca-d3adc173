@@ -287,7 +287,7 @@ function SessionPage() {
       )}
 
       <Dialog open={stage === "review"}>
-        <DialogContent showCloseButton={false} className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Presentation review</DialogTitle>
           </DialogHeader>
