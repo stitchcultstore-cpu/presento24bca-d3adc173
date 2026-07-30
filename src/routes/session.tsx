@@ -39,7 +39,7 @@ export const Route = createFileRoute("/session")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: SessionPage;
+  component: SessionPage,
 });
 
 type Stage = "absent" | "wheel" | "screen" | "review";
