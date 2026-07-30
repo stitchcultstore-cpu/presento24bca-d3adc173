@@ -70,8 +70,17 @@ export function PresentationScreen({
           </p>
         </div>
 
-        <CountdownTimer seconds={120} running={running} onComplete={onComplete} />
+        <div className="flex flex-col items-center gap-5">
+          <CountdownTimer seconds={120} running={running} onComplete={onComplete} />
+          <button
+            onClick={onComplete}
+            className="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            End presentation &amp; review
+          </button>
+        </div>
       </div>
     </div>
   );
 }
+
