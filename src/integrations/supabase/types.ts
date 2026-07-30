@@ -14,7 +14,234 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: []
+      }
+      departments: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      presentations: {
+        Row: {
+          created_at: string
+          cycle: number
+          id: string
+          kind: string
+          needs_repeat: boolean
+          period: number | null
+          presented_on: string
+          rating: number | null
+          review: string | null
+          roll_no: number
+          student_name: string
+          subject: string | null
+          teacher: string | null
+          topic: string | null
+        }
+        Insert: {
+          created_at?: string
+          cycle?: number
+          id?: string
+          kind?: string
+          needs_repeat?: boolean
+          period?: number | null
+          presented_on?: string
+          rating?: number | null
+          review?: string | null
+          roll_no: number
+          student_name: string
+          subject?: string | null
+          teacher?: string | null
+          topic?: string | null
+        }
+        Update: {
+          created_at?: string
+          cycle?: number
+          id?: string
+          kind?: string
+          needs_repeat?: boolean
+          period?: number | null
+          presented_on?: string
+          rating?: number | null
+          review?: string | null
+          roll_no?: number
+          student_name?: string
+          subject?: string | null
+          teacher?: string | null
+          topic?: string | null
+        }
+        Relationships: []
+      }
+      repeat_queue: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string | null
+          resolved: boolean
+          roll_no: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          resolved?: boolean
+          roll_no: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          resolved?: boolean
+          roll_no?: number
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          photo_url: string | null
+          roll_no: number
+          topic: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          photo_url?: string | null
+          roll_no: number
+          topic?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          photo_url?: string | null
+          roll_no?: number
+          topic?: string | null
+        }
+        Relationships: []
+      }
+      subjects: {
+        Row: {
+          code: string | null
+          created_at: string
+          department: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          department?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          department?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      teachers: {
+        Row: {
+          created_at: string
+          department: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          department?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          department?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      timetable: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          department: string
+          end_time: string
+          id: string
+          period: number
+          section: string
+          semester: string
+          start_time: string
+          subject: string
+          teacher: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          department: string
+          end_time: string
+          id?: string
+          period: number
+          section: string
+          semester: string
+          start_time: string
+          subject: string
+          teacher: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          department?: string
+          end_time?: string
+          id?: string
+          period?: number
+          section?: string
+          semester?: string
+          start_time?: string
+          subject?: string
+          teacher?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
