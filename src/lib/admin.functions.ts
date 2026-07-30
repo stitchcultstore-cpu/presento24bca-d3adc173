@@ -142,16 +142,22 @@ export const saveNamed = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await requireAdmin();
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const payload =
-      data.table === "departments"
-        ? { name: data.name, code: data.extra }
-        : data.table === "teachers"
-          ? { name: data.name, department: data.extra }
-          : { name: data.name, code: data.extra };
-    const { error } = await supabaseAdmin.from(data.table).insert(payload);
+    const error =
+      data.table === "teachers"
+        ? (await supabaseAdmin
+            .from("teachers")
+            .insert({ name: data.name, department: data.extra })).error
+        : data.table === "departments"
+          ? (await supabaseAdmin
+              .from("departments")
+              .insert({ name: data.name, code: data.extra })).error
+          : (await supabaseAdmin
+              .from("subjects")
+              .insert({ name: data.name, code: data.extra })).error;
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 export const setForcedRoll = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
