@@ -81,7 +81,12 @@ export function PresentationScreen({
         </div>
 
         <div className="flex flex-col items-center gap-5">
-          <CountdownTimer seconds={120} running={active} onComplete={onComplete} />
+          <CountdownTimer
+            key={timerKey}
+            seconds={120}
+            running={active}
+            onComplete={onComplete}
+          />
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => setPaused(false)}
@@ -96,6 +101,13 @@ export function PresentationScreen({
               className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
             >
               <Pause className="h-4 w-4" /> Pause
+            </button>
+            <button
+              onClick={handleReset}
+              disabled={!running}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+            >
+              <RotateCcw className="h-4 w-4" /> Reset timer
             </button>
             <button
               onClick={onComplete}
