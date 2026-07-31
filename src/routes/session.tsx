@@ -260,18 +260,32 @@ function SessionPage() {
                 stateOf={stateOf}
                 target={selected?.roll_no ?? null}
                 spinning={spinning}
+                revealed={revealed}
               />
-              <div className="mt-6 flex justify-center">
-                <Button
-                  size="lg"
-                  disabled={spinning || spin.isPending || remaining === 0}
-                  onClick={() => spin.mutate()}
-                >
-                  {spinning ? "Spinning…" : "Spin the wheel"}
-                </Button>
-              </div>
-            </>
-          )}
+              {revealed && selected ? (
+                <div className="mt-6 animate-fade-in text-center">
+                  <p className="text-xl font-semibold">{selected.name}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {selected.topic || "Topic not provided"}
+                  </p>
+                  <p className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
+                    Roll number
+                  </p>
+                  <p className="text-4xl font-semibold tabular-nums text-primary">
+                    {selected.roll_no}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 flex justify-center">
+                  <Button
+                    size="lg"
+                    disabled={spinning || spin.isPending || remaining === 0}
+                    onClick={() => spin.mutate()}
+                  >
+                    {spinning ? "Spinning…" : "Spin the wheel"}
+                  </Button>
+                </div>
+              )}
         </section>
       </div>
 
