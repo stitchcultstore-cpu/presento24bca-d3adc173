@@ -31,7 +31,13 @@ export function PresentationScreen({
   isRepeat: boolean;
 }) {
   const [paused, setPaused] = useState(false);
+  const [timerKey, setTimerKey] = useState(0);
   const active = running && !paused;
+
+  const handleReset = () => {
+    setTimerKey((k) => k + 1);
+    setPaused(false);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-card">
