@@ -88,13 +88,13 @@ function SessionPage() {
 
   const stateOf = useCallback(
     (roll: number): RollState => {
-      if (selected?.roll_no === roll && !spinning) return "selected";
+      if (selected?.roll_no === roll && revealed) return "selected";
       if (absent.includes(roll)) return "absent";
       if (presented.has(roll)) return "presented";
       return "available";
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selected, spinning, absent, data?.presentedRolls],
+    [selected, revealed, absent, data?.presentedRolls],
   );
 
   const spin = useMutation({
@@ -105,10 +105,12 @@ function SessionPage() {
         return;
       }
       setKind(result.kind);
+      setRevealed(false);
       setSpinning(true);
       setSelected(result.student);
       setTimeout(async () => {
         setSpinning(false);
+        setRevealed(true);
         const created = await record({
           data: {
             roll_no: result.student.roll_no,
@@ -120,8 +122,10 @@ function SessionPage() {
           },
         });
         setPresentationId(created.id);
-        setStage("screen");
-        setTimerRunning(true);
+        setTimeout(() => {
+          setStage("screen");
+          setTimerRunning(true);
+        }, 1800);
       }, 4400);
     },
     onError: () => toast.error("Could not select a roll number."),
