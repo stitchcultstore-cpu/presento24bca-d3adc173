@@ -286,6 +286,8 @@ function SessionPage() {
                   </Button>
                 </div>
               )}
+            </>
+          )}
         </section>
       </div>
 
