@@ -66,6 +66,7 @@ function SessionPage() {
   const [absentInput, setAbsentInput] = useState("");
   const [absent, setAbsent] = useState<number[]>([]);
   const [spinning, setSpinning] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const [selected, setSelected] = useState<{
     roll_no: number;
     name: string;
@@ -88,13 +89,13 @@ function SessionPage() {
 
   const stateOf = useCallback(
     (roll: number): RollState => {
-      if (selected?.roll_no === roll && !spinning) return "selected";
+      if (selected?.roll_no === roll && revealed) return "selected";
       if (absent.includes(roll)) return "absent";
       if (presented.has(roll)) return "presented";
       return "available";
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selected, spinning, absent, data?.presentedRolls],
+    [selected, revealed, absent, data?.presentedRolls],
   );
 
   const spin = useMutation({
@@ -105,10 +106,12 @@ function SessionPage() {
         return;
       }
       setKind(result.kind);
+      setRevealed(false);
       setSpinning(true);
       setSelected(result.student);
       setTimeout(async () => {
         setSpinning(false);
+        setRevealed(true);
         const created = await record({
           data: {
             roll_no: result.student.roll_no,
@@ -120,8 +123,10 @@ function SessionPage() {
           },
         });
         setPresentationId(created.id);
-        setStage("screen");
-        setTimerRunning(true);
+        setTimeout(() => {
+          setStage("screen");
+          setTimerRunning(true);
+        }, 1800);
       }, 4400);
     },
     onError: () => toast.error("Could not select a roll number."),
@@ -141,6 +146,7 @@ function SessionPage() {
       toast.success("Review saved");
       setStage("wheel");
       setSelected(null);
+      setRevealed(false);
       setPresentationId(null);
       await refetch();
       router.invalidate();
@@ -255,16 +261,32 @@ function SessionPage() {
                 stateOf={stateOf}
                 target={selected?.roll_no ?? null}
                 spinning={spinning}
+                revealed={revealed}
               />
-              <div className="mt-6 flex justify-center">
-                <Button
-                  size="lg"
-                  disabled={spinning || spin.isPending || remaining === 0}
-                  onClick={() => spin.mutate()}
-                >
-                  {spinning ? "Spinning…" : "Spin the wheel"}
-                </Button>
-              </div>
+              {revealed && selected ? (
+                <div className="mt-6 animate-fade-in text-center">
+                  <p className="text-xl font-semibold">{selected.name}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {selected.topic || "Topic not provided"}
+                  </p>
+                  <p className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
+                    Roll number
+                  </p>
+                  <p className="text-4xl font-semibold tabular-nums text-primary">
+                    {selected.roll_no}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 flex justify-center">
+                  <Button
+                    size="lg"
+                    disabled={spinning || spin.isPending || remaining === 0}
+                    onClick={() => spin.mutate()}
+                  >
+                    {spinning ? "Spinning…" : "Spin the wheel"}
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </section>

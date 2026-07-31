@@ -60,11 +60,14 @@ function Home() {
           </p>
         </div>
         <div className="text-right text-sm text-muted-foreground">
-          <div className="flex items-center justify-end gap-1.5">
+          <div className="flex items-center justify-end gap-1.5" suppressHydrationWarning>
             <CalendarDays className="h-3.5 w-3.5" />
             {DAY_NAMES[now.getDay()]}, {now.toLocaleDateString()}
           </div>
-          <div className="flex items-center justify-end gap-1.5 tabular-nums">
+          <div
+            className="flex items-center justify-end gap-1.5 tabular-nums"
+            suppressHydrationWarning
+          >
             <Clock className="h-3.5 w-3.5" />
             {now.toLocaleTimeString()}
           </div>
