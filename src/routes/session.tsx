@@ -66,6 +66,7 @@ function SessionPage() {
   const [absentInput, setAbsentInput] = useState("");
   const [absent, setAbsent] = useState<number[]>([]);
   const [spinning, setSpinning] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const [selected, setSelected] = useState<{
     roll_no: number;
     name: string;
