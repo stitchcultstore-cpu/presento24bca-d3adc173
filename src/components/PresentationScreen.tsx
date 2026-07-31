@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pause, Play } from "lucide-react";
+import { Pause, Play, RotateCcw } from "lucide-react";
 
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { DAY_NAMES } from "@/lib/timetable";
