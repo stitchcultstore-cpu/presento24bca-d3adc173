@@ -146,6 +146,7 @@ function SessionPage() {
       toast.success("Review saved");
       setStage("wheel");
       setSelected(null);
+      setRevealed(false);
       setPresentationId(null);
       await refetch();
       router.invalidate();
