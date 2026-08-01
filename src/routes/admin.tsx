@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { Trash2, Upload } from "lucide-react";
+import { Download, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   adminLogin,
   adminLogout,
   adminStatus,
+  cycleReport,
   deleteRow,
   importStudents,
   resetCycle,
@@ -128,9 +129,82 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const saveNamedFn = useServerFn(saveNamed);
   const forceFn = useServerFn(setForcedRoll);
   const cycleFn = useServerFn(resetCycle);
+  const reportFn = useServerFn(cycleReport);
+  const [downloading, setDownloading] = useState<number | null>(null);
 
   const { data, refetch } = useQuery({ queryKey: ["admin-data"], queryFn: () => fetchAll() });
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const cycleList: number[] = (() => {
+    const set = new Set<number>(data?.cycles ?? []);
+    set.add(data?.cycle ?? 1);
+    return Array.from(set).sort((a, b) => b - a);
+  })();
+
+  const fmtDuration = (secs: number | null) => {
+    if (secs == null) return "—";
+    const m = Math.floor(secs / 60);
+    const s2 = secs % 60;
+    return `${m}m ${String(s2).padStart(2, "0")}s`;
+  };
+
+  const downloadReport = async (cycle: number) => {
+    setDownloading(cycle);
+    try {
+      const report = await reportFn({ data: { cycle } });
+      const XLSX = await import("xlsx");
+      const rows = report.rows.map((r, i) => ({
+        "#": i + 1,
+        Roll: r.roll_no,
+        Student: r.student_name,
+        Topic: r.topic ?? "",
+        Type: r.kind === "repeat" ? "Re-presentation" : "Original",
+        Date: r.presented_on,
+        Period: r.period ?? "",
+        Subject: r.subject ?? "",
+        Teacher: r.teacher ?? "",
+        "Time taken": fmtDuration(r.duration_seconds),
+        "Time taken (s)": r.duration_seconds ?? "",
+        Rating: r.rating ?? "",
+        "Teacher review": r.review ?? "",
+        "Needs re-presentation": r.needs_repeat ? "Yes" : "No",
+      }));
+      const wb = XLSX.utils.book_new();
+      const sheet = XLSX.utils.json_to_sheet(
+        rows.length ? rows : [{ Note: "No presentations recorded in this cycle" }],
+      );
+      sheet["!cols"] = [
+        { wch: 4 },
+        { wch: 6 },
+        { wch: 24 },
+        { wch: 34 },
+        { wch: 16 },
+        { wch: 12 },
+        { wch: 8 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 12 },
+        { wch: 14 },
+        { wch: 8 },
+        { wch: 50 },
+        { wch: 20 },
+      ];
+      XLSX.utils.book_append_sheet(wb, sheet, `Cycle ${cycle}`);
+      const pendingSheet = XLSX.utils.json_to_sheet(
+        report.pending.length
+          ? report.pending.map((p) => ({ Roll: p.roll_no, Student: p.name, Topic: p.topic ?? "" }))
+          : [{ Note: "Every student has presented in this cycle" }],
+      );
+      pendingSheet["!cols"] = [{ wch: 6 }, { wch: 24 }, { wch: 34 }];
+      XLSX.utils.book_append_sheet(wb, pendingSheet, "Yet to present");
+      XLSX.writeFile(wb, `presento-cycle-${cycle}-report.xlsx`);
+      toast.success(`Cycle ${cycle} report downloaded`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not build the report");
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   const run = async (fn: () => Promise<unknown>, message: string) => {
     try {
