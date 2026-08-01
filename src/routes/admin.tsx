@@ -502,6 +502,41 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </form>
           </Panel>
 
+          <Panel title="Cycle reports">
+            <p className="text-sm text-muted-foreground">
+              Download an Excel report per cycle: student, topic, date, period, subject, teacher,
+              time taken, rating, review and re-presentation flag.
+            </p>
+            <div className="mt-4 space-y-2">
+              {cycleList.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No presentations recorded yet.</p>
+              ) : (
+                cycleList.map((c) => (
+                  <div
+                    key={c}
+                    className="flex items-center justify-between border-b border-border pb-2 text-sm"
+                  >
+                    <span>
+                      Cycle {c}
+                      {c === (data?.cycle ?? 1) ? (
+                        <span className="ml-2 text-xs text-muted-foreground">(current)</span>
+                      ) : null}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={downloading === c}
+                      onClick={() => void downloadReport(c)}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      {downloading === c ? "Preparing…" : "Download Excel"}
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </Panel>
+
           <Panel title="Recent presentations">
             <div className="max-h-72 overflow-auto text-sm">
               {(data?.history ?? []).map((h) => (
