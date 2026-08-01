@@ -51,7 +51,7 @@ export const adminLogout = createServerFn({ method: "POST" }).handler(async () =
 export const adminData = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdmin();
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [students, timetable, teachers, departments, subjects, queue, settings, history] =
+  const [students, timetable, teachers, departments, subjects, queue, settings, history, allCycles] =
     await Promise.all([
       supabaseAdmin.from("students").select("*").order("roll_no"),
       supabaseAdmin.from("timetable").select("*").order("day_of_week").order("period"),
@@ -65,6 +65,7 @@ export const adminData = createServerFn({ method: "GET" }).handler(async () => {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100),
+      supabaseAdmin.from("presentations").select("cycle"),
     ]);
   return {
     students: students.data ?? [],
@@ -74,10 +75,40 @@ export const adminData = createServerFn({ method: "GET" }).handler(async () => {
     subjects: subjects.data ?? [],
     queue: queue.data ?? [],
     history: history.data ?? [],
+    cycles: Array.from(new Set((allCycles.data ?? []).map((c) => c.cycle))).sort(
+      (a, b) => b - a,
+    ),
     cycle: Number(settings.data?.find((s) => s.key === "current_cycle")?.value ?? "1"),
     forcedRoll: settings.data?.find((s) => s.key === "forced_roll")?.value ?? "",
   };
 });
+
+export const cycleReport = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ cycle: z.number().int().min(1).max(1000) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [presentations, students] = await Promise.all([
+      supabaseAdmin
+        .from("presentations")
+        .select("*")
+        .eq("cycle", data.cycle)
+        .order("presented_on")
+        .order("created_at"),
+      supabaseAdmin.from("students").select("roll_no, name, topic").order("roll_no"),
+    ]);
+    const rows = presentations.data ?? [];
+    const presentedRolls = new Set(
+      rows.filter((r) => r.kind === "original").map((r) => r.roll_no),
+    );
+    return {
+      cycle: data.cycle,
+      rows,
+      pending: (students.data ?? []).filter((s) => !presentedRolls.has(s.roll_no)),
+    };
+  });
 
 export const importStudents = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>

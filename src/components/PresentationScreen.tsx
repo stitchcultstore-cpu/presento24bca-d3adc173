@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
 
 import { CountdownTimer } from "@/components/CountdownTimer";
@@ -27,12 +27,21 @@ export function PresentationScreen({
   period: number;
   now: Date;
   running: boolean;
-  onComplete: () => void;
+  onComplete: (elapsedSeconds: number) => void;
   isRepeat: boolean;
 }) {
   const [paused, setPaused] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
   const active = running && !paused;
+  const elapsed = useRef(0);
+
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => {
+      elapsed.current += 1;
+    }, 1000);
+    return () => clearInterval(t);
+  }, [active]);
 
   const handleReset = () => {
     setTimerKey((k) => k + 1);
@@ -85,7 +94,7 @@ export function PresentationScreen({
             key={timerKey}
             seconds={120}
             running={active}
-            onComplete={onComplete}
+            onComplete={() => onComplete(elapsed.current)}
           />
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
@@ -110,7 +119,7 @@ export function PresentationScreen({
               <RotateCcw className="h-4 w-4" /> Reset timer
             </button>
             <button
-              onClick={onComplete}
+              onClick={() => onComplete(elapsed.current)}
               className="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               End presentation &amp; review
