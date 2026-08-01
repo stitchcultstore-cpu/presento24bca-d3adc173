@@ -51,7 +51,7 @@ export const adminLogout = createServerFn({ method: "POST" }).handler(async () =
 export const adminData = createServerFn({ method: "GET" }).handler(async () => {
   await requireAdmin();
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [students, timetable, teachers, departments, subjects, queue, settings, history] =
+  const [students, timetable, teachers, departments, subjects, queue, settings, history, allCycles] =
     await Promise.all([
       supabaseAdmin.from("students").select("*").order("roll_no"),
       supabaseAdmin.from("timetable").select("*").order("day_of_week").order("period"),
@@ -65,6 +65,7 @@ export const adminData = createServerFn({ method: "GET" }).handler(async () => {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100),
+      supabaseAdmin.from("presentations").select("cycle"),
     ]);
   return {
     students: students.data ?? [],
@@ -74,9 +75,9 @@ export const adminData = createServerFn({ method: "GET" }).handler(async () => {
     subjects: subjects.data ?? [],
     queue: queue.data ?? [],
     history: history.data ?? [],
-    cycles: Array.from(
-      new Set((history.data ?? []).map((h) => h.cycle)),
-    ).sort((a, b) => b - a),
+    cycles: Array.from(new Set((allCycles.data ?? []).map((c) => c.cycle))).sort(
+      (a, b) => b - a,
+    ),
     cycle: Number(settings.data?.find((s) => s.key === "current_cycle")?.value ?? "1"),
     forcedRoll: settings.data?.find((s) => s.key === "forced_roll")?.value ?? "",
   };
