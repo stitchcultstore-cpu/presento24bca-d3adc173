@@ -118,6 +118,7 @@ function Home() {
       <div className="mt-auto pt-10 text-xs text-muted-foreground">
         Cycle {data?.cycle ?? 1} · {data?.students.length ?? 0} students on the roster
       </div>
+      <Footer />
     </main>
   );
 }
