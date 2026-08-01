@@ -76,6 +76,7 @@ function SessionPage() {
   const [kind, setKind] = useState<"original" | "repeat">("original");
   const [presentationId, setPresentationId] = useState<string | null>(null);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [durationSeconds, setDurationSeconds] = useState(0);
 
   const resolved = data ? resolveCurrentSession(data.timetable, now) : null;
   const entry = resolved?.status === "active" ? resolved.entry : null;
@@ -140,6 +141,7 @@ function SessionPage() {
           review: value.review,
           rating: value.rating,
           needs_repeat: value.needsRepeat,
+          duration_seconds: durationSeconds,
         },
       }),
     onSuccess: async () => {
@@ -148,6 +150,7 @@ function SessionPage() {
       setSelected(null);
       setRevealed(false);
       setPresentationId(null);
+      setDurationSeconds(0);
       await refetch();
       router.invalidate();
     },
@@ -301,8 +304,9 @@ function SessionPage() {
           now={now}
           running={timerRunning}
           isRepeat={kind === "repeat"}
-          onComplete={() => {
+          onComplete={(elapsedSeconds) => {
             setTimerRunning(false);
+            setDurationSeconds(elapsedSeconds);
             setStage("review");
           }}
         />

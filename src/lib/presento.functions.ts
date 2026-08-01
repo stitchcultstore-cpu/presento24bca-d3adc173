@@ -19,6 +19,7 @@ const reviewSchema = z.object({
   review: z.string().trim().max(2000),
   rating: z.number().int().min(1).max(5),
   needs_repeat: z.boolean(),
+  duration_seconds: z.number().int().min(0).max(36000).optional(),
 });
 
 /** Everything the classroom app needs to render a session. */
@@ -174,6 +175,7 @@ export const submitReview = createServerFn({ method: "POST" })
         review: data.review,
         rating: data.rating,
         needs_repeat: data.needs_repeat,
+        duration_seconds: data.duration_seconds ?? null,
       })
       .eq("id", data.id)
       .select("roll_no")
