@@ -59,11 +59,6 @@ There should be no button or link inside the Main Application that opens the Adm
 The Admin Panel should have its own route and login page.
 
 Use an environment variable for the admin password.
-
-Default password:
-
-15884
-
 ---
 
 # DESIGN STYLE
