@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Clock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Footer } from "@/components/Footer";
 import { SessionMeta } from "@/components/SessionMeta";
 import { getSessionData } from "@/lib/presento.functions";
 import { DAY_NAMES, formatTime, resolveCurrentSession } from "@/lib/timetable";
