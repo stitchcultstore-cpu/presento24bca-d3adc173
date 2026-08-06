@@ -187,10 +187,11 @@ function SessionPage() {
 
   const saveReview = useMutation({
     mutationFn: async (value: {
-      grade: Parameters<Parameters<typeof ReviewForm>[0]["onSubmit"]>[0]["grade"];
+      grade: ReviewGrade;
       remarks: string;
       needsRepeat: boolean;
     }) =>
+
       review({
         data: {
           id: presentationId!,
