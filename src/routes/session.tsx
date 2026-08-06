@@ -20,6 +20,8 @@ import {
   saveAbsentees,
   submitReview,
 } from "@/lib/presento.functions";
+import type { ReviewGrade } from "@/lib/review";
+
 import { parseAbsentRolls, resolveCurrentSession } from "@/lib/timetable";
 
 export const Route = createFileRoute("/session")({
