@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  addRepeatEntry,
   adminData,
   adminLogin,
   adminLogout,
@@ -18,13 +19,16 @@ import {
   cycleReport,
   deleteRow,
   importStudents,
+  importTimetable,
   resetCycle,
   saveNamed,
   saveStudent,
   saveTimetableEntry,
   setForcedRoll,
+  setOverrideDay,
 } from "@/lib/admin.functions";
-import { DAY_NAMES, formatTime } from "@/lib/timetable";
+import { DAY_NAMES, formatTime, toMinutes } from "@/lib/timetable";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
