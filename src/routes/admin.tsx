@@ -176,8 +176,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         Teacher: r.teacher ?? "",
         "Time taken": fmtDuration(r.duration_seconds),
         "Time taken (s)": r.duration_seconds ?? "",
+        Review: r.review_grade ?? "",
         Rating: r.rating ?? "",
-        "Teacher review": r.review ?? "",
+        "Teacher remarks": r.review ?? "",
+
         "Needs re-presentation": r.needs_repeat ? "Yes" : "No",
       }));
       const wb = XLSX.utils.book_new();
