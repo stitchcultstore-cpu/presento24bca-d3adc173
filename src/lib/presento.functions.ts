@@ -1,6 +1,24 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+export const REVIEW_GRADES = [
+  "Excellent",
+  "Very Good",
+  "Good",
+  "Average",
+  "Needs Improvement",
+  "Poor",
+] as const;
+
+export const GRADE_RATING: Record<string, number> = {
+  Excellent: 5,
+  "Very Good": 5,
+  Good: 4,
+  Average: 3,
+  "Needs Improvement": 2,
+  Poor: 1,
+};
+
 const pickSchema = z.object({
   absent: z.array(z.number().int().min(1).max(200)).max(200),
 });
@@ -16,11 +34,13 @@ const recordSchema = z.object({
 
 const reviewSchema = z.object({
   id: z.string().uuid(),
+  review_grade: z.enum(REVIEW_GRADES),
   review: z.string().trim().max(2000),
-  rating: z.number().int().min(1).max(5),
   needs_repeat: z.boolean(),
   duration_seconds: z.number().int().min(0).max(36000).optional(),
 });
+
+const todayKey = () => new Date().toISOString().slice(0, 10);
 
 /** Everything the classroom app needs to render a session. */
 export const getSessionData = createServerFn({ method: "GET" }).handler(async () => {
@@ -30,24 +50,66 @@ export const getSessionData = createServerFn({ method: "GET" }).handler(async ()
     supabaseAdmin.from("students").select("*").order("roll_no"),
     supabaseAdmin.from("timetable").select("*").order("day_of_week").order("period"),
     supabaseAdmin.from("app_settings").select("*"),
-    supabaseAdmin.from("presentations").select("roll_no, cycle, kind"),
+    supabaseAdmin.from("presentations").select("roll_no, student_name, cycle, kind"),
     supabaseAdmin.from("repeat_queue").select("*").eq("resolved", false),
   ]);
 
-  const cycle = Number(
-    settings.data?.find((s) => s.key === "current_cycle")?.value ?? "1",
+  const setting = (key: string) => settings.data?.find((s) => s.key === key)?.value ?? "";
+  const cycle = Number(setting("current_cycle") || "1");
+  const overrideRaw = setting("override_day");
+  const overrideDay =
+    overrideRaw === "" || overrideRaw == null ? null : Number(overrideRaw);
+
+  const roster = students.data ?? [];
+  const nameOf = (roll: number) =>
+    roster.find((s) => s.roll_no === roll)?.name ?? `Roll ${roll}`;
+
+  const presentedRows = (presentations.data ?? []).filter(
+    (p) => p.cycle === cycle && p.kind === "original",
   );
 
+  const absentDate = setting("absent_date");
+  const absent =
+    absentDate === todayKey()
+      ? setting("absent_rolls")
+          .split(",")
+          .map((v) => Number(v))
+          .filter((n) => Number.isInteger(n) && n > 0)
+      : [];
+
   return {
-    students: students.data ?? [],
+    students: roster,
     timetable: timetable.data ?? [],
     cycle,
-    presentedRolls: (presentations.data ?? [])
-      .filter((p) => p.cycle === cycle && p.kind === "original")
-      .map((p) => p.roll_no),
+    overrideDay: Number.isInteger(overrideDay) ? overrideDay : null,
+    absent,
+    absentConfirmed: absentDate === todayKey(),
+    presentedRolls: presentedRows.map((p) => p.roll_no),
+    presentedStudents: Array.from(
+      new Map(
+        presentedRows.map((p) => [p.roll_no, { roll_no: p.roll_no, name: nameOf(p.roll_no) }]),
+      ).values(),
+    ).sort((a, b) => a.roll_no - b.roll_no),
     repeatQueue: (queue.data ?? []).map((q) => q.roll_no),
+    repeatStudents: (queue.data ?? [])
+      .map((q) => ({ roll_no: q.roll_no, name: nameOf(q.roll_no) }))
+      .sort((a, b) => a.roll_no - b.roll_no),
   };
 });
+
+/** Persists today's absentees so a page refresh keeps the session intact. */
+export const saveAbsentees = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => pickSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("app_settings")
+      .upsert({ key: "absent_rolls", value: data.absent.join(",") });
+    await supabaseAdmin
+      .from("app_settings")
+      .upsert({ key: "absent_date", value: todayKey() });
+    return { ok: true };
+  });
 
 /**
  * Chooses the next roll number on the server. The wheel still spins for the
@@ -81,48 +143,43 @@ export const pickNextRoll = createServerFn({ method: "POST" })
       return new Set((data ?? []).map((p) => p.roll_no));
     };
 
-    let kind: "original" | "repeat" = "original";
-    let presented = await presentedFor(cycle);
-    let eligible = roster.filter(
-      (s) => !presented.has(s.roll_no) && !absent.has(s.roll_no),
-    );
+    const { data: queue } = await supabaseAdmin
+      .from("repeat_queue")
+      .select("roll_no")
+      .eq("resolved", false);
+    const queued = new Set((queue ?? []).map((q) => q.roll_no));
 
-    if (eligible.length === 0) {
-      const { data: queue } = await supabaseAdmin
-        .from("repeat_queue")
-        .select("roll_no")
-        .eq("resolved", false);
-      const queued = (queue ?? []).map((q) => q.roll_no);
-      const repeatEligible = roster.filter(
-        (s) => queued.includes(s.roll_no) && !absent.has(s.roll_no),
+    let presented = await presentedFor(cycle);
+
+    // Fresh students plus anyone pending a re-presentation; absentees skipped.
+    const buildPool = () =>
+      roster.filter(
+        (s) => !absent.has(s.roll_no) && (!presented.has(s.roll_no) || queued.has(s.roll_no)),
       );
 
-      if (repeatEligible.length > 0) {
-        kind = "repeat";
-        eligible = repeatEligible;
-      } else {
-        const allDone = roster.every((s) => presented.has(s.roll_no));
-        const queueEmpty = queued.length === 0;
-        if (allDone && queueEmpty) {
-          cycle += 1;
-          await supabaseAdmin
-            .from("app_settings")
-            .upsert({ key: "current_cycle", value: String(cycle) });
-          presented = new Set();
-          eligible = roster.filter((s) => !absent.has(s.roll_no));
-        }
-      }
+    let pool = buildPool();
+
+    if (pool.length === 0 && roster.every((s) => presented.has(s.roll_no))) {
+      cycle += 1;
+      await supabaseAdmin
+        .from("app_settings")
+        .upsert({ key: "current_cycle", value: String(cycle) });
+      presented = new Set();
+      pool = buildPool();
     }
 
-    if (eligible.length === 0) {
+    if (pool.length === 0) {
       return { ok: false as const, reason: "Every available student has presented." };
     }
 
-    let chosen = eligible[Math.floor(Math.random() * eligible.length)];
-    if (forced && eligible.some((s) => s.roll_no === forced)) {
-      chosen = eligible.find((s) => s.roll_no === forced)!;
+    let chosen = pool[Math.floor(Math.random() * pool.length)];
+    if (forced && pool.some((s) => s.roll_no === forced)) {
+      chosen = pool.find((s) => s.roll_no === forced)!;
       await supabaseAdmin.from("app_settings").upsert({ key: "forced_roll", value: "" });
     }
+
+    const kind: "original" | "repeat" =
+      queued.has(chosen.roll_no) && presented.has(chosen.roll_no) ? "repeat" : "original";
 
     return { ok: true as const, student: chosen, kind, cycle };
   });
@@ -172,8 +229,9 @@ export const submitReview = createServerFn({ method: "POST" })
     const { data: row, error } = await supabaseAdmin
       .from("presentations")
       .update({
+        review_grade: data.review_grade,
         review: data.review,
-        rating: data.rating,
+        rating: GRADE_RATING[data.review_grade] ?? 3,
         needs_repeat: data.needs_repeat,
         duration_seconds: data.duration_seconds ?? null,
       })
@@ -183,10 +241,18 @@ export const submitReview = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
 
     if (data.needs_repeat) {
-      await supabaseAdmin.from("repeat_queue").insert({
-        roll_no: row.roll_no,
-        reason: "Marked for re-presentation by teacher",
-      });
+      const { data: existing } = await supabaseAdmin
+        .from("repeat_queue")
+        .select("id")
+        .eq("roll_no", row.roll_no)
+        .eq("resolved", false)
+        .maybeSingle();
+      if (!existing) {
+        await supabaseAdmin.from("repeat_queue").insert({
+          roll_no: row.roll_no,
+          reason: "Marked for re-presentation by teacher",
+        });
+      }
     }
     return { ok: true };
   });
