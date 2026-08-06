@@ -17,6 +17,7 @@ import {
   getSessionData,
   pickNextRoll,
   recordPresentation,
+  saveAbsentees,
   submitReview,
 } from "@/lib/presento.functions";
 import { parseAbsentRolls, resolveCurrentSession } from "@/lib/timetable";
@@ -44,6 +45,39 @@ export const Route = createFileRoute("/session")({
 
 type Stage = "absent" | "wheel" | "screen" | "review";
 
+function RollList({
+  title,
+  empty,
+  rows,
+}: {
+  title: string;
+  empty: string;
+  rows: { roll_no: number; name: string }[];
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-medium">{title}</h2>
+        <span className="text-xs tabular-nums text-muted-foreground">{rows.length}</span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">{empty}</p>
+      ) : (
+        <ul className="mt-3 max-h-56 space-y-1.5 overflow-auto text-sm">
+          {rows.map((r) => (
+            <li key={r.roll_no} className="flex gap-2 border-b border-border pb-1.5">
+              <span className="w-7 shrink-0 tabular-nums text-muted-foreground">
+                {r.roll_no}
+              </span>
+              <span className="truncate">{r.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function SessionPage() {
   const router = useRouter();
   const [now, setNow] = useState(() => new Date());
@@ -56,6 +90,7 @@ function SessionPage() {
   const pick = useServerFn(pickNextRoll);
   const record = useServerFn(recordPresentation);
   const review = useServerFn(submitReview);
+  const persistAbsent = useServerFn(saveAbsentees);
 
   const { data, refetch } = useQuery({
     queryKey: ["session-data"],
@@ -65,6 +100,7 @@ function SessionPage() {
   const [stage, setStage] = useState<Stage>("absent");
   const [absentInput, setAbsentInput] = useState("");
   const [absent, setAbsent] = useState<number[]>([]);
+  const [hydrated, setHydrated] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [selected, setSelected] = useState<{
@@ -78,7 +114,20 @@ function SessionPage() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(0);
 
-  const resolved = data ? resolveCurrentSession(data.timetable, now) : null;
+  // Restore today's confirmed absentees so a refresh does not reset the session.
+  useEffect(() => {
+    if (!data || hydrated) return;
+    setHydrated(true);
+    if (data.absentConfirmed) {
+      setAbsent(data.absent);
+      setAbsentInput(data.absent.join(", "));
+      setStage("wheel");
+    }
+  }, [data, hydrated]);
+
+  const resolved = data
+    ? resolveCurrentSession(data.timetable, now, data.overrideDay)
+    : null;
   const entry = resolved?.status === "active" ? resolved.entry : null;
 
   const rolls = useMemo(
@@ -86,17 +135,20 @@ function SessionPage() {
     [data],
   );
   const presented = new Set(data?.presentedRolls ?? []);
-  const remaining = rolls.filter((r) => !presented.has(r) && !absent.includes(r)).length;
+  const repeatRolls = new Set(data?.repeatQueue ?? []);
+  const remaining = rolls.filter(
+    (r) => !absent.includes(r) && (!presented.has(r) || repeatRolls.has(r)),
+  ).length;
 
   const stateOf = useCallback(
     (roll: number): RollState => {
       if (selected?.roll_no === roll && revealed) return "selected";
       if (absent.includes(roll)) return "absent";
-      if (presented.has(roll)) return "presented";
+      if (presented.has(roll) && !repeatRolls.has(roll)) return "presented";
       return "available";
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selected, revealed, absent, data?.presentedRolls],
+    [selected, revealed, absent, data?.presentedRolls, data?.repeatQueue],
   );
 
   const spin = useMutation({
@@ -134,12 +186,16 @@ function SessionPage() {
   });
 
   const saveReview = useMutation({
-    mutationFn: async (value: { review: string; rating: number; needsRepeat: boolean }) =>
+    mutationFn: async (value: {
+      grade: Parameters<Parameters<typeof ReviewForm>[0]["onSubmit"]>[0]["grade"];
+      remarks: string;
+      needsRepeat: boolean;
+    }) =>
       review({
         data: {
           id: presentationId!,
-          review: value.review,
-          rating: value.rating,
+          review_grade: value.grade,
+          review: value.remarks,
           needs_repeat: value.needsRepeat,
           duration_seconds: durationSeconds,
         },
@@ -161,7 +217,9 @@ function SessionPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6">
         <div className="rounded-lg border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
-          <h1 className="text-lg font-semibold">No active presentation session.</h1>
+          <h1 className="text-lg font-semibold">
+            No active presentation session at the moment.
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             A session can only be conducted during a scheduled period.
           </p>
@@ -174,7 +232,7 @@ function SessionPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8">
+    <main className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
       <Link
         to="/"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -183,7 +241,7 @@ function SessionPage() {
       </Link>
 
       <section className="mt-5 rounded-lg border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <SessionMeta entry={entry} now={now} compact />
+        <SessionMeta entry={entry} now={now} overrideDay={data?.overrideDay ?? null} compact />
       </section>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
@@ -209,8 +267,10 @@ function SessionPage() {
                 <Button
                   className="w-full"
                   onClick={() => {
-                    setAbsent(parseAbsentRolls(absentInput, Math.max(...rolls, 55)));
+                    const parsed = parseAbsentRolls(absentInput, Math.max(...rolls, 55));
+                    setAbsent(parsed);
                     setStage("wheel");
+                    void persistAbsent({ data: { absent: parsed } });
                   }}
                 >
                   Confirm absentees
@@ -242,14 +302,20 @@ function SessionPage() {
                 <dt className="text-muted-foreground">Presentation cycle</dt>
                 <dd className="font-medium tabular-nums">{data?.cycle ?? 1}</dd>
               </div>
-              <div className="flex items-baseline justify-between">
-                <dt className="text-muted-foreground">Re-presentation queue</dt>
-                <dd className="font-medium tabular-nums">
-                  {data?.repeatQueue.length ?? 0}
-                </dd>
-              </div>
             </dl>
           </div>
+
+          <RollList
+            title="Presented"
+            empty="Nobody has presented in this cycle yet."
+            rows={data?.presentedStudents ?? []}
+          />
+
+          <RollList
+            title="Re-presentations"
+            empty="No student is marked for re-presentation."
+            rows={data?.repeatStudents ?? []}
+          />
         </aside>
 
         <section className="rounded-lg border border-border bg-card p-6 shadow-[var(--shadow-card)]">

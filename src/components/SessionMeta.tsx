@@ -1,4 +1,4 @@
-import { DAY_NAMES, formatTime, type TimetableEntry } from "@/lib/timetable";
+import { DAY_NAMES, effectiveDay, formatTime, type TimetableEntry } from "@/lib/timetable";
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -15,11 +15,16 @@ export function SessionMeta({
   entry,
   now,
   compact = false,
+  overrideDay = null,
 }: {
   entry: TimetableEntry;
   now: Date;
   compact?: boolean;
+  overrideDay?: number | null;
 }) {
+  const day = effectiveDay(now, overrideDay);
+  const overridden = overrideDay != null && overrideDay !== now.getDay();
+
   return (
     <dl
       className={
@@ -30,7 +35,10 @@ export function SessionMeta({
       }
     >
       <Field label="Date" value={now.toLocaleDateString()} />
-      <Field label="Day" value={DAY_NAMES[now.getDay()]} />
+      <Field
+        label="Day"
+        value={DAY_NAMES[day] + (overridden ? " (override)" : "")}
+      />
       <Field
         label="Period"
         value={`Period ${entry.period} · ${formatTime(entry.start_time)}–${formatTime(entry.end_time)}`}
