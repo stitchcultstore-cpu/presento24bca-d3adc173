@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { CheckCircle2, Pause, Play, RotateCcw } from "lucide-react";
 
 import { CountdownTimer } from "@/components/CountdownTimer";
 import { DAY_NAMES } from "@/lib/timetable";
@@ -30,9 +30,10 @@ export function PresentationScreen({
   onComplete: (elapsedSeconds: number) => void;
   isRepeat: boolean;
 }) {
+  const [started, setStarted] = useState(true);
   const [paused, setPaused] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
-  const active = running && !paused;
+  const active = running && started && !paused;
   const elapsed = useRef(0);
 
   useEffect(() => {
@@ -45,12 +46,17 @@ export function PresentationScreen({
 
   const handleReset = () => {
     setTimerKey((k) => k + 1);
+    elapsed.current = 0;
     setPaused(false);
+    setStarted(true);
   };
+
+  const btn =
+    "inline-flex items-center gap-2 rounded-lg border-2 border-border px-6 py-3 text-lg font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-35";
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-card">
-      <header className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-b border-border px-6 py-3 text-center text-sm text-muted-foreground sm:px-10">
+      <header className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 border-b border-border px-6 py-3 text-center text-base text-muted-foreground sm:px-10">
         <span className="font-medium text-foreground">{subject}</span>
         <span>{teacher}</span>
         <span>Period {period}</span>
@@ -59,10 +65,10 @@ export function PresentationScreen({
         </span>
       </header>
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-8 text-center">
-        <div className="flex max-w-3xl flex-col items-center gap-4 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-6 text-center">
+        <div className="flex max-w-4xl flex-col items-center gap-3 text-center">
           {isRepeat && (
-            <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-medium uppercase tracking-wide text-accent">
+            <span className="rounded-full bg-accent/15 px-3 py-1 text-sm font-medium uppercase tracking-wide text-accent">
               Re-presentation
             </span>
           )}
@@ -70,61 +76,60 @@ export function PresentationScreen({
             <img
               src={student.photo_url}
               alt={`Photo of ${student.name}`}
-              className="h-28 w-28 rounded-full border border-border object-cover"
+              className="h-24 w-24 rounded-full border border-border object-cover"
             />
           ) : null}
-          <h1 className="text-[clamp(2rem,5vw,3.75rem)] font-semibold leading-tight">
+          <h1 className="text-[clamp(1.9rem,4.5vw,3.5rem)] font-semibold leading-tight">
             {student.name}
           </h1>
-          <p className="text-[clamp(1.1rem,2.4vw,1.75rem)] text-muted-foreground">
+          <p className="text-[clamp(1rem,2.2vw,1.6rem)] text-muted-foreground">
             {student.topic || "Topic not provided"}
           </p>
           <div className="flex flex-col items-center">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Roll number
             </p>
-            <p className="text-[clamp(2.5rem,7vw,5rem)] font-semibold leading-none tabular-nums text-primary">
+            <p className="text-[clamp(2.2rem,6vw,4.5rem)] font-semibold leading-none tabular-nums text-primary">
               {student.roll_no}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-5">
-          <CountdownTimer
-            key={timerKey}
-            seconds={120}
-            running={active}
-            onComplete={() => onComplete(elapsed.current)}
-          />
-          <div className="flex flex-wrap items-center justify-center gap-3">
+        <CountdownTimer
+          key={timerKey}
+          seconds={120}
+          running={active}
+          onComplete={() => onComplete(elapsed.current)}
+        />
+      </div>
+
+      {/* Timer controls pinned to the bottom of the screen so they stay visible on a TV. */}
+      <div className="border-t-2 border-border bg-background px-6 py-5">
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          {!started || paused ? (
             <button
-              onClick={() => setPaused(false)}
-              disabled={active}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+              onClick={() => {
+                setStarted(true);
+                setPaused(false);
+              }}
+              className={btn}
             >
-              <Play className="h-4 w-4" /> Start
+              <Play className="h-5 w-5" /> {paused ? "Resume" : "Start"}
             </button>
-            <button
-              onClick={() => setPaused(true)}
-              disabled={!active}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-            >
-              <Pause className="h-4 w-4" /> Pause
+          ) : (
+            <button onClick={() => setPaused(true)} className={btn}>
+              <Pause className="h-5 w-5" /> Pause
             </button>
-            <button
-              onClick={handleReset}
-              disabled={!running}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
-            >
-              <RotateCcw className="h-4 w-4" /> Reset timer
-            </button>
-            <button
-              onClick={() => onComplete(elapsed.current)}
-              className="rounded-md border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              End presentation &amp; review
-            </button>
-          </div>
+          )}
+          <button onClick={handleReset} className={btn}>
+            <RotateCcw className="h-5 w-5" /> Reset
+          </button>
+          <button
+            onClick={() => onComplete(elapsed.current)}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-lg font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            <CheckCircle2 className="h-5 w-5" /> Finish &amp; review
+          </button>
         </div>
       </div>
     </div>

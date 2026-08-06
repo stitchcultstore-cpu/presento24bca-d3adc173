@@ -2,18 +2,23 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { REVIEW_GRADES, type ReviewGrade } from "@/lib/review";
 import { cn } from "@/lib/utils";
 
 type Props = {
   studentName: string;
   rollNo: number;
-  onSubmit: (value: { review: string; rating: number; needsRepeat: boolean }) => void;
+  onSubmit: (value: {
+    grade: ReviewGrade;
+    remarks: string;
+    needsRepeat: boolean;
+  }) => void;
   submitting?: boolean;
 };
 
 export function ReviewForm({ studentName, rollNo, onSubmit, submitting }: Props) {
-  const [review, setReview] = useState("");
-  const [rating, setRating] = useState(4);
+  const [grade, setGrade] = useState<ReviewGrade>("Good");
+  const [remarks, setRemarks] = useState("");
   const [needsRepeat, setNeedsRepeat] = useState(false);
 
   return (
@@ -21,7 +26,7 @@ export function ReviewForm({ studentName, rollNo, onSubmit, submitting }: Props)
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        onSubmit({ review: review.trim().slice(0, 2000), rating, needsRepeat });
+        onSubmit({ grade, remarks: remarks.trim().slice(0, 2000), needsRepeat });
       }}
     >
       <div>
@@ -32,61 +37,47 @@ export function ReviewForm({ studentName, rollNo, onSubmit, submitting }: Props)
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="review">Teacher review</Label>
+        <Label htmlFor="grade">Review</Label>
+        <select
+          id="grade"
+          value={grade}
+          onChange={(e) => setGrade(e.target.value as ReviewGrade)}
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+        >
+          {REVIEW_GRADES.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="remarks">Remarks (optional)</Label>
         <Textarea
-          id="review"
-          value={review}
+          id="remarks"
+          value={remarks}
           maxLength={2000}
-          onChange={(e) => setReview(e.target.value)}
+          onChange={(e) => setRemarks(e.target.value)}
           placeholder="Clarity, preparation, delivery, subject knowledge…"
           rows={4}
         />
       </div>
 
-      <div className="space-y-2">
-        <Label>Overall rating</Label>
-        <div className="flex gap-2">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setRating(n)}
-              className={cn(
-                "h-10 w-10 rounded-md border text-sm font-medium transition-colors",
-                rating === n
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card hover:bg-muted",
-              )}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Require re-presentation</Label>
-        <div className="flex gap-2">
-          {[
-            { label: "No", value: false },
-            { label: "Yes", value: true },
-          ].map((opt) => (
-            <button
-              key={opt.label}
-              type="button"
-              onClick={() => setNeedsRepeat(opt.value)}
-              className={cn(
-                "h-10 rounded-md border px-5 text-sm font-medium transition-colors",
-                needsRepeat === opt.value
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card hover:bg-muted",
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <label
+        className={cn(
+          "flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2.5 text-sm transition-colors",
+          needsRepeat ? "border-primary bg-primary/5" : "border-border",
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={needsRepeat}
+          onChange={(e) => setNeedsRepeat(e.target.checked)}
+          className="h-4 w-4 accent-[var(--color-primary)]"
+        />
+        Needs re-presentation
+      </label>
 
       <Button type="submit" disabled={submitting} className="w-full">
         {submitting ? "Saving…" : "Save review"}

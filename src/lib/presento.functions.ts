@@ -1,23 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { GRADE_RATING, REVIEW_GRADES } from "./review";
 
-export const REVIEW_GRADES = [
-  "Excellent",
-  "Very Good",
-  "Good",
-  "Average",
-  "Needs Improvement",
-  "Poor",
-] as const;
-
-export const GRADE_RATING: Record<string, number> = {
-  Excellent: 5,
-  "Very Good": 5,
-  Good: 4,
-  Average: 3,
-  "Needs Improvement": 2,
-  Poor: 1,
-};
 
 const pickSchema = z.object({
   absent: z.array(z.number().int().min(1).max(200)).max(200),
