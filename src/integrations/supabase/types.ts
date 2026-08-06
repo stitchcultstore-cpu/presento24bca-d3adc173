@@ -65,6 +65,7 @@ export type Database = {
           presented_on: string
           rating: number | null
           review: string | null
+          review_grade: string | null
           roll_no: number
           student_name: string
           subject: string | null
@@ -82,6 +83,7 @@ export type Database = {
           presented_on?: string
           rating?: number | null
           review?: string | null
+          review_grade?: string | null
           roll_no: number
           student_name: string
           subject?: string | null
@@ -99,6 +101,7 @@ export type Database = {
           presented_on?: string
           rating?: number | null
           review?: string | null
+          review_grade?: string | null
           roll_no?: number
           student_name?: string
           subject?: string | null

@@ -1,0 +1,1 @@
+ALTER TABLE public.presentations ADD COLUMN IF NOT EXISTS review_grade text;

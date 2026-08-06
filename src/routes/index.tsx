@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Footer } from "@/components/Footer";
 import { SessionMeta } from "@/components/SessionMeta";
 import { getSessionData } from "@/lib/presento.functions";
-import { DAY_NAMES, formatTime, resolveCurrentSession } from "@/lib/timetable";
+import {
+  DAY_NAMES,
+  effectiveDay,
+  formatTime,
+  resolveCurrentSession,
+} from "@/lib/timetable";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,7 +55,11 @@ function Home() {
     queryFn: () => fetchData(),
   });
 
-  const resolved = data ? resolveCurrentSession(data.timetable, now) : null;
+  const resolved = data
+    ? resolveCurrentSession(data.timetable, now, data.overrideDay)
+    : null;
+  const day = data ? effectiveDay(now, data.overrideDay) : now.getDay();
+  const overridden = data?.overrideDay != null && data.overrideDay !== now.getDay();
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col px-5 py-10 sm:px-8">
@@ -63,7 +73,8 @@ function Home() {
         <div className="text-right text-sm text-muted-foreground">
           <div className="flex items-center justify-end gap-1.5" suppressHydrationWarning>
             <CalendarDays className="h-3.5 w-3.5" />
-            {DAY_NAMES[now.getDay()]}, {now.toLocaleDateString()}
+            {DAY_NAMES[day]}
+            {overridden ? " (override)" : ""}, {now.toLocaleDateString()}
           </div>
           <div
             className="flex items-center justify-end gap-1.5 tabular-nums"
@@ -85,7 +96,11 @@ function Home() {
             <p className="text-sm text-muted-foreground">Loading timetable…</p>
           ) : resolved.status === "active" ? (
             <>
-              <SessionMeta entry={resolved.entry} now={now} />
+              <SessionMeta
+                entry={resolved.entry}
+                now={now}
+                overrideDay={data?.overrideDay ?? null}
+              />
               <div className="mt-7 border-t border-border pt-6">
                 <Button asChild size="lg">
                   <Link to="/session">Start presentation session</Link>
@@ -94,26 +109,31 @@ function Home() {
             </>
           ) : resolved.status === "upcoming" ? (
             <div className="space-y-1.5">
-              <p className="text-base font-medium">No active presentation session.</p>
+              <p className="text-base font-medium">
+                No active presentation session at the moment.
+              </p>
               <p className="text-sm text-muted-foreground">
                 Next class starts at {formatTime(resolved.entry.start_time)} —{" "}
-                {resolved.entry.subject} (Period {resolved.entry.period},{" "}
-                {resolved.entry.department} · Sem {resolved.entry.semester} ·{" "}
-                {resolved.entry.section}).
+                {resolved.entry.subject} with {resolved.entry.teacher} (Period{" "}
+                {resolved.entry.period}, {resolved.entry.department} · Sem{" "}
+                {resolved.entry.semester} · {resolved.entry.section}).
               </p>
             </div>
           ) : (
             <div className="space-y-1.5">
-              <p className="text-base font-medium">No active presentation session.</p>
+              <p className="text-base font-medium">
+                No active presentation session at the moment.
+              </p>
               <p className="text-sm text-muted-foreground">
                 {data && data.timetable.length === 0
                   ? "No timetable has been configured yet."
-                  : "There are no further classes scheduled today."}
+                  : `There are no further classes scheduled for ${DAY_NAMES[day]}.`}
               </p>
             </div>
           )}
         </div>
       </section>
+
 
       <div className="mt-auto pt-10 text-xs text-muted-foreground">
         Cycle {data?.cycle ?? 1} · {data?.students.length ?? 0} students on the roster

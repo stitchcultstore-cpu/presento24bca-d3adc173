@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  addRepeatEntry,
   adminData,
   adminLogin,
   adminLogout,
@@ -18,13 +19,16 @@ import {
   cycleReport,
   deleteRow,
   importStudents,
+  importTimetable,
   resetCycle,
   saveNamed,
   saveStudent,
   saveTimetableEntry,
   setForcedRoll,
+  setOverrideDay,
 } from "@/lib/admin.functions";
-import { DAY_NAMES, formatTime } from "@/lib/timetable";
+import { DAY_NAMES, formatTime, toMinutes } from "@/lib/timetable";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -131,10 +135,16 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const forceFn = useServerFn(setForcedRoll);
   const cycleFn = useServerFn(resetCycle);
   const reportFn = useServerFn(cycleReport);
+  const overrideFn = useServerFn(setOverrideDay);
+  const repeatFn = useServerFn(addRepeatEntry);
+  const importTimetableFn = useServerFn(importTimetable);
   const [downloading, setDownloading] = useState<number | null>(null);
+  const [ttMode, setTtMode] = useState<"replace" | "merge">("replace");
 
   const { data, refetch } = useQuery({ queryKey: ["admin-data"], queryFn: () => fetchAll() });
   const fileRef = useRef<HTMLInputElement>(null);
+  const ttFileRef = useRef<HTMLInputElement>(null);
+
 
   const cycleList: number[] = (() => {
     const set = new Set<number>(data?.cycles ?? []);
@@ -166,8 +176,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         Teacher: r.teacher ?? "",
         "Time taken": fmtDuration(r.duration_seconds),
         "Time taken (s)": r.duration_seconds ?? "",
+        Review: r.review_grade ?? "",
         Rating: r.rating ?? "",
-        "Teacher review": r.review ?? "",
+        "Teacher remarks": r.review ?? "",
+
         "Needs re-presentation": r.needs_repeat ? "Yes" : "No",
       }));
       const wb = XLSX.utils.book_new();
@@ -186,7 +198,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         { wch: 18 },
         { wch: 12 },
         { wch: 14 },
+        { wch: 18 },
         { wch: 8 },
+
         { wch: 50 },
         { wch: 20 },
       ];
@@ -250,6 +264,168 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
     await run(() => importFn({ data: { replace: true, rows } }), `Imported ${rows.length} students`);
   };
+
+  const DAY_LOOKUP: Record<string, number> = {
+    sunday: 0,
+    sun: 0,
+    monday: 1,
+    mon: 1,
+    tuesday: 2,
+    tue: 2,
+    tues: 2,
+    wednesday: 3,
+    wed: 3,
+    thursday: 4,
+    thu: 4,
+    thurs: 4,
+    friday: 5,
+    fri: 5,
+    saturday: 6,
+    sat: 6,
+  };
+
+  /** Accepts "09:30", "9:30 AM" or an Excel time serial (fraction of a day). */
+  const parseTime = (value: unknown): string | null => {
+    if (value == null || value === "") return null;
+    if (typeof value === "number") {
+      const mins = Math.round(value * 24 * 60) % (24 * 60);
+      return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+    }
+    const raw = String(value).trim();
+    const m = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/);
+    if (!m) return null;
+    let h = Number(m[1]);
+    const min = Number(m[2]);
+    const suffix = m[3]?.toLowerCase();
+    if (suffix === "pm" && h < 12) h += 12;
+    if (suffix === "am" && h === 12) h = 0;
+    if (h > 23 || min > 59) return null;
+    return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  };
+
+  const downloadTimetableTemplate = async () => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet([
+      {
+        Day: "Monday",
+        Period: 1,
+        "Start Time": "09:00",
+        "End Time": "09:50",
+        Subject: "Data Structures",
+        Teacher: "Dr. A. Kumar",
+        Department: "BCA",
+        Semester: "4",
+        Section: "A",
+      },
+      {
+        Day: "Monday",
+        Period: 2,
+        "Start Time": "09:50",
+        "End Time": "10:40",
+        Subject: "Operating Systems",
+        Teacher: "Prof. S. Nair",
+        Department: "BCA",
+        Semester: "4",
+        Section: "A",
+      },
+    ]);
+    sheet["!cols"] = [
+      { wch: 12 },
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 24 },
+      { wch: 20 },
+      { wch: 14 },
+      { wch: 10 },
+      { wch: 10 },
+    ];
+    XLSX.utils.book_append_sheet(wb, sheet, "Timetable");
+    XLSX.writeFile(wb, "presento-timetable-template.xlsx");
+  };
+
+  const onTimetableFile = async (file: File) => {
+    const XLSX = await import("xlsx");
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      wb.Sheets[wb.SheetNames[0]],
+    );
+
+    const problems: string[] = [];
+    const rows = raw.flatMap((r, index) => {
+      const get = (...keys: string[]) => {
+        for (const k of Object.keys(r)) {
+          if (keys.includes(k.toLowerCase().trim().replace(/\s+/g, " "))) return r[k];
+        }
+        return undefined;
+      };
+      const line = index + 2;
+      const dayRaw = String(get("day", "day of week", "weekday") ?? "").trim();
+      const day = Number.isInteger(Number(dayRaw))
+        ? Number(dayRaw)
+        : DAY_LOOKUP[dayRaw.toLowerCase()];
+      const period = Number(get("period", "period no", "period number"));
+      const start = parseTime(get("start time", "start", "from", "start_time"));
+      const end = parseTime(get("end time", "end", "to", "end_time"));
+      const subject = String(get("subject") ?? "").trim();
+      const teacher = String(get("teacher", "faculty") ?? "").trim();
+      const department = String(get("department", "dept") ?? "").trim() || "General";
+      const semester = String(get("semester", "sem") ?? "").trim() || "1";
+      const section = String(get("section", "class", "classroom") ?? "").trim() || "A";
+
+      if (day == null || Number.isNaN(day) || day < 0 || day > 6) {
+        problems.push(`Row ${line}: invalid Day`);
+        return [];
+      }
+      if (!Number.isInteger(period) || period < 1 || period > 20) {
+        problems.push(`Row ${line}: invalid Period`);
+        return [];
+      }
+      if (!start || !end) {
+        problems.push(`Row ${line}: invalid Start/End Time`);
+        return [];
+      }
+      if (toMinutes(end) <= toMinutes(start)) {
+        problems.push(`Row ${line}: End Time must be after Start Time`);
+        return [];
+      }
+      if (!subject || !teacher) {
+        problems.push(`Row ${line}: Subject and Teacher are required`);
+        return [];
+      }
+      return [
+        {
+          day_of_week: day,
+          period,
+          start_time: start,
+          end_time: end,
+          subject: subject.slice(0, 120),
+          teacher: teacher.slice(0, 120),
+          department: department.slice(0, 120),
+          semester: semester.slice(0, 40),
+          section: section.slice(0, 40),
+        },
+      ];
+    });
+
+    if (rows.length === 0) {
+      toast.error(
+        problems[0] ?? "No valid rows found. Expected: Day, Period, Start Time, End Time, Subject, Teacher.",
+      );
+      return;
+    }
+    if (problems.length) {
+      toast.warning(`${problems.length} row(s) skipped: ${problems.slice(0, 3).join("; ")}`);
+    }
+    await run(
+      () => importTimetableFn({ data: { mode: ttMode, rows } }),
+      `Imported ${rows.length} periods`,
+    );
+  };
+
+
 
   return (
     <main className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
@@ -371,7 +547,80 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </TabsContent>
 
         <TabsContent value="timetable" className="mt-5 space-y-5">
+          <Panel title="Override today's timetable">
+            <p className="text-sm text-muted-foreground">
+              Run the main portal on another weekday's timetable — for example Monday's
+              periods on a Saturday. Disable it to return to the real current day.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {[1, 2, 3, 4, 5].map((d) => (
+                <Button
+                  key={d}
+                  size="sm"
+                  variant={data?.overrideDay === d ? "default" : "outline"}
+                  onClick={() =>
+                    run(() => overrideFn({ data: { day: d } }), `Using ${DAY_NAMES[d]}'s timetable`)
+                  }
+                >
+                  {DAY_NAMES[d]}
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                variant={data?.overrideDay == null ? "default" : "outline"}
+                onClick={() => run(() => overrideFn({ data: { day: null } }), "Override disabled")}
+              >
+                Disable override
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Currently:{" "}
+              <b className="text-foreground">
+                {data?.overrideDay == null
+                  ? "Automatic (real current day)"
+                  : `${DAY_NAMES[data.overrideDay]} timetable`}
+              </b>
+            </p>
+          </Panel>
+
+          <Panel title="Upload timetable from Excel">
+            <p className="text-sm text-muted-foreground">
+              Upload an .xlsx file with columns <b>Day</b>, <b>Period</b>, <b>Start Time</b>,{" "}
+              <b>End Time</b>, <b>Subject</b>, <b>Teacher</b> and optionally{" "}
+              <b>Department</b>, <b>Semester</b>, <b>Section</b>. Rows are validated before
+              importing.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <select
+                value={ttMode}
+                onChange={(e) => setTtMode(e.target.value as "replace" | "merge")}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="replace">Replace existing timetable</option>
+                <option value="merge">Update only matching periods</option>
+              </select>
+              <input
+                ref={ttFileRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onTimetableFile(f);
+                  e.target.value = "";
+                }}
+              />
+              <Button onClick={() => ttFileRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" /> Upload timetable
+              </Button>
+              <Button variant="outline" onClick={() => void downloadTimetableTemplate()}>
+                <Download className="mr-2 h-4 w-4" /> Sample template
+              </Button>
+            </div>
+          </Panel>
+
           <Panel title="Add a period">
+
             <form
               className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5"
               onSubmit={(e) => {
@@ -631,18 +880,57 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           </Panel>
         </TabsContent>
 
-        <TabsContent value="queue" className="mt-5">
-          <Panel title="Re-presentation queue">
+        <TabsContent value="queue" className="mt-5 space-y-5">
+          <Panel title="Add a student to the re-presentation list">
+            <p className="text-sm text-muted-foreground">
+              The roll number is put back into the current cycle straight away, so the wheel
+              can select the student again.
+            </p>
+            <form
+              className="mt-4 flex flex-wrap gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const f = new FormData(e.currentTarget);
+                void run(
+                  () =>
+                    repeatFn({
+                      data: {
+                        roll_no: Number(f.get("roll_no")),
+                        reason: (String(f.get("reason")).trim() || null) as string | null,
+                      },
+                    }),
+                  "Added to the re-presentation list",
+                );
+                e.currentTarget.reset();
+              }}
+            >
+              <Input
+                name="roll_no"
+                type="number"
+                min={1}
+                max={200}
+                placeholder="Roll"
+                className="w-28"
+                required
+              />
+              <Input name="reason" placeholder="Reason (optional)" maxLength={300} />
+              <Button type="submit">Add</Button>
+            </form>
+          </Panel>
+
+          <Panel title="Re-presentation list">
             {(data?.queue ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">The queue is empty.</p>
+              <p className="text-sm text-muted-foreground">The list is empty.</p>
             ) : (
               <ul className="text-sm">
                 {(data?.queue ?? []).map((q) => (
                   <li
                     key={q.id}
-                    className="flex items-center justify-between border-b border-border py-2"
+                    className="flex items-center justify-between gap-3 border-b border-border py-2"
                   >
-                    <span className="tabular-nums">Roll {q.roll_no}</span>
+                    <span className="tabular-nums">
+                      {q.roll_no} · {q.name}
+                    </span>
                     <span className="text-muted-foreground">
                       {q.resolved ? "Completed" : "Pending"}
                     </span>
@@ -651,7 +939,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       onClick={() =>
                         run(
                           () => deleteFn({ data: { table: "repeat_queue", id: q.id } }),
-                          "Removed from queue",
+                          "Removed from the list",
                         )
                       }
                     >
@@ -662,6 +950,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </ul>
             )}
           </Panel>
+
         </TabsContent>
       </Tabs>
       <Footer />

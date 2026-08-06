@@ -40,12 +40,20 @@ export type ResolvedSession =
   | { status: "upcoming"; entry: TimetableEntry }
   | { status: "none" };
 
+/** The weekday the app should behave as: an admin override, else the real day. */
+export function effectiveDay(now: Date, overrideDay?: number | null): number {
+  return overrideDay != null && overrideDay >= 0 && overrideDay <= 6
+    ? overrideDay
+    : now.getDay();
+}
+
 /** Resolves the class happening right now from the timetable and system clock. */
 export function resolveCurrentSession(
   entries: TimetableEntry[],
   now: Date,
+  overrideDay?: number | null,
 ): ResolvedSession {
-  const day = now.getDay();
+  const day = effectiveDay(now, overrideDay);
   const minutes = now.getHours() * 60 + now.getMinutes();
   const today = entries
     .filter((e) => e.day_of_week === day)
@@ -61,6 +69,7 @@ export function resolveCurrentSession(
 
   return { status: "none" };
 }
+
 
 export function parseAbsentRolls(input: string, max: number): number[] {
   return Array.from(
