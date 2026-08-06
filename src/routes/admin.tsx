@@ -198,7 +198,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         { wch: 18 },
         { wch: 12 },
         { wch: 14 },
+        { wch: 18 },
         { wch: 8 },
+
         { wch: 50 },
         { wch: 20 },
       ];
