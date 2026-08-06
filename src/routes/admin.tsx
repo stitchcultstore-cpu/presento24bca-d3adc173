@@ -880,18 +880,57 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           </Panel>
         </TabsContent>
 
-        <TabsContent value="queue" className="mt-5">
-          <Panel title="Re-presentation queue">
+        <TabsContent value="queue" className="mt-5 space-y-5">
+          <Panel title="Add a student to the re-presentation list">
+            <p className="text-sm text-muted-foreground">
+              The roll number is put back into the current cycle straight away, so the wheel
+              can select the student again.
+            </p>
+            <form
+              className="mt-4 flex flex-wrap gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const f = new FormData(e.currentTarget);
+                void run(
+                  () =>
+                    repeatFn({
+                      data: {
+                        roll_no: Number(f.get("roll_no")),
+                        reason: (String(f.get("reason")).trim() || null) as string | null,
+                      },
+                    }),
+                  "Added to the re-presentation list",
+                );
+                e.currentTarget.reset();
+              }}
+            >
+              <Input
+                name="roll_no"
+                type="number"
+                min={1}
+                max={200}
+                placeholder="Roll"
+                className="w-28"
+                required
+              />
+              <Input name="reason" placeholder="Reason (optional)" maxLength={300} />
+              <Button type="submit">Add</Button>
+            </form>
+          </Panel>
+
+          <Panel title="Re-presentation list">
             {(data?.queue ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">The queue is empty.</p>
+              <p className="text-sm text-muted-foreground">The list is empty.</p>
             ) : (
               <ul className="text-sm">
                 {(data?.queue ?? []).map((q) => (
                   <li
                     key={q.id}
-                    className="flex items-center justify-between border-b border-border py-2"
+                    className="flex items-center justify-between gap-3 border-b border-border py-2"
                   >
-                    <span className="tabular-nums">Roll {q.roll_no}</span>
+                    <span className="tabular-nums">
+                      {q.roll_no} · {q.name}
+                    </span>
                     <span className="text-muted-foreground">
                       {q.resolved ? "Completed" : "Pending"}
                     </span>
@@ -900,7 +939,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       onClick={() =>
                         run(
                           () => deleteFn({ data: { table: "repeat_queue", id: q.id } }),
-                          "Removed from queue",
+                          "Removed from the list",
                         )
                       }
                     >
@@ -911,6 +950,7 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </ul>
             )}
           </Panel>
+
         </TabsContent>
       </Tabs>
       <Footer />
