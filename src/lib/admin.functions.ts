@@ -67,21 +67,114 @@ export const adminData = createServerFn({ method: "GET" }).handler(async () => {
         .limit(100),
       supabaseAdmin.from("presentations").select("cycle"),
     ]);
+  const setting = (key: string) =>
+    settings.data?.find((s) => s.key === key)?.value ?? "";
+  const roster = students.data ?? [];
+  const overrideRaw = setting("override_day");
   return {
-    students: students.data ?? [],
+    students: roster,
     timetable: timetable.data ?? [],
     teachers: teachers.data ?? [],
     departments: departments.data ?? [],
     subjects: subjects.data ?? [],
-    queue: queue.data ?? [],
+    queue: (queue.data ?? []).map((q) => ({
+      ...q,
+      name: roster.find((s) => s.roll_no === q.roll_no)?.name ?? `Roll ${q.roll_no}`,
+    })),
     history: history.data ?? [],
     cycles: Array.from(new Set((allCycles.data ?? []).map((c) => c.cycle))).sort(
       (a, b) => b - a,
     ),
-    cycle: Number(settings.data?.find((s) => s.key === "current_cycle")?.value ?? "1"),
-    forcedRoll: settings.data?.find((s) => s.key === "forced_roll")?.value ?? "",
+    cycle: Number(setting("current_cycle") || "1"),
+    forcedRoll: setting("forced_roll"),
+    overrideDay: overrideRaw === "" ? null : Number(overrideRaw),
   };
 });
+
+/** Makes the app behave as another weekday (e.g. Monday's timetable on a Saturday). */
+export const setOverrideDay = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ day: z.number().int().min(0).max(6).nullable() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("app_settings")
+      .upsert({ key: "override_day", value: data.day == null ? "" : String(data.day) });
+    return { ok: true };
+  });
+
+/** Manually queues a student for re-presentation, putting them back in the pool. */
+export const addRepeatEntry = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        roll_no: z.number().int().min(1).max(200),
+        reason: z.string().trim().max(300).nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: student } = await supabaseAdmin
+      .from("students")
+      .select("roll_no")
+      .eq("roll_no", data.roll_no)
+      .maybeSingle();
+    if (!student) throw new Error(`Roll ${data.roll_no} is not on the roster`);
+
+    const { data: existing } = await supabaseAdmin
+      .from("repeat_queue")
+      .select("id")
+      .eq("roll_no", data.roll_no)
+      .eq("resolved", false)
+      .maybeSingle();
+    if (existing) throw new Error(`Roll ${data.roll_no} is already in the list`);
+
+    const { error } = await supabaseAdmin
+      .from("repeat_queue")
+      .insert({ roll_no: data.roll_no, reason: data.reason ?? "Added by admin" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Bulk timetable import from an Excel upload. */
+export const importTimetable = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        mode: z.enum(["replace", "merge"]),
+        rows: z.array(timetableSchema).min(1).max(500),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.mode === "replace") {
+      await supabaseAdmin.from("timetable").delete().gte("day_of_week", 0);
+      const { error } = await supabaseAdmin.from("timetable").insert(data.rows);
+      if (error) throw new Error(error.message);
+      return { count: data.rows.length };
+    }
+
+    for (const row of data.rows) {
+      const { data: existing } = await supabaseAdmin
+        .from("timetable")
+        .select("id")
+        .eq("day_of_week", row.day_of_week)
+        .eq("period", row.period)
+        .maybeSingle();
+      const { error } = existing
+        ? await supabaseAdmin.from("timetable").update(row).eq("id", existing.id)
+        : await supabaseAdmin.from("timetable").insert(row);
+      if (error) throw new Error(error.message);
+    }
+    return { count: data.rows.length };
+  });
+
 
 export const cycleReport = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
