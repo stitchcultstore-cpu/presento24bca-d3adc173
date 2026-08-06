@@ -547,7 +547,80 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </TabsContent>
 
         <TabsContent value="timetable" className="mt-5 space-y-5">
+          <Panel title="Override today's timetable">
+            <p className="text-sm text-muted-foreground">
+              Run the main portal on another weekday's timetable — for example Monday's
+              periods on a Saturday. Disable it to return to the real current day.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {[1, 2, 3, 4, 5].map((d) => (
+                <Button
+                  key={d}
+                  size="sm"
+                  variant={data?.overrideDay === d ? "default" : "outline"}
+                  onClick={() =>
+                    run(() => overrideFn({ data: { day: d } }), `Using ${DAY_NAMES[d]}'s timetable`)
+                  }
+                >
+                  {DAY_NAMES[d]}
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                variant={data?.overrideDay == null ? "default" : "outline"}
+                onClick={() => run(() => overrideFn({ data: { day: null } }), "Override disabled")}
+              >
+                Disable override
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Currently:{" "}
+              <b className="text-foreground">
+                {data?.overrideDay == null
+                  ? "Automatic (real current day)"
+                  : `${DAY_NAMES[data.overrideDay]} timetable`}
+              </b>
+            </p>
+          </Panel>
+
+          <Panel title="Upload timetable from Excel">
+            <p className="text-sm text-muted-foreground">
+              Upload an .xlsx file with columns <b>Day</b>, <b>Period</b>, <b>Start Time</b>,{" "}
+              <b>End Time</b>, <b>Subject</b>, <b>Teacher</b> and optionally{" "}
+              <b>Department</b>, <b>Semester</b>, <b>Section</b>. Rows are validated before
+              importing.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <select
+                value={ttMode}
+                onChange={(e) => setTtMode(e.target.value as "replace" | "merge")}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="replace">Replace existing timetable</option>
+                <option value="merge">Update only matching periods</option>
+              </select>
+              <input
+                ref={ttFileRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void onTimetableFile(f);
+                  e.target.value = "";
+                }}
+              />
+              <Button onClick={() => ttFileRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" /> Upload timetable
+              </Button>
+              <Button variant="outline" onClick={() => void downloadTimetableTemplate()}>
+                <Download className="mr-2 h-4 w-4" /> Sample template
+              </Button>
+            </div>
+          </Panel>
+
           <Panel title="Add a period">
+
             <form
               className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5"
               onSubmit={(e) => {
