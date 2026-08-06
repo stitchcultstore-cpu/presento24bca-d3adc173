@@ -265,6 +265,168 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     await run(() => importFn({ data: { replace: true, rows } }), `Imported ${rows.length} students`);
   };
 
+  const DAY_LOOKUP: Record<string, number> = {
+    sunday: 0,
+    sun: 0,
+    monday: 1,
+    mon: 1,
+    tuesday: 2,
+    tue: 2,
+    tues: 2,
+    wednesday: 3,
+    wed: 3,
+    thursday: 4,
+    thu: 4,
+    thurs: 4,
+    friday: 5,
+    fri: 5,
+    saturday: 6,
+    sat: 6,
+  };
+
+  /** Accepts "09:30", "9:30 AM" or an Excel time serial (fraction of a day). */
+  const parseTime = (value: unknown): string | null => {
+    if (value == null || value === "") return null;
+    if (typeof value === "number") {
+      const mins = Math.round(value * 24 * 60) % (24 * 60);
+      return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+    }
+    const raw = String(value).trim();
+    const m = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/);
+    if (!m) return null;
+    let h = Number(m[1]);
+    const min = Number(m[2]);
+    const suffix = m[3]?.toLowerCase();
+    if (suffix === "pm" && h < 12) h += 12;
+    if (suffix === "am" && h === 12) h = 0;
+    if (h > 23 || min > 59) return null;
+    return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  };
+
+  const downloadTimetableTemplate = async () => {
+    const XLSX = await import("xlsx");
+    const wb = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet([
+      {
+        Day: "Monday",
+        Period: 1,
+        "Start Time": "09:00",
+        "End Time": "09:50",
+        Subject: "Data Structures",
+        Teacher: "Dr. A. Kumar",
+        Department: "BCA",
+        Semester: "4",
+        Section: "A",
+      },
+      {
+        Day: "Monday",
+        Period: 2,
+        "Start Time": "09:50",
+        "End Time": "10:40",
+        Subject: "Operating Systems",
+        Teacher: "Prof. S. Nair",
+        Department: "BCA",
+        Semester: "4",
+        Section: "A",
+      },
+    ]);
+    sheet["!cols"] = [
+      { wch: 12 },
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 24 },
+      { wch: 20 },
+      { wch: 14 },
+      { wch: 10 },
+      { wch: 10 },
+    ];
+    XLSX.utils.book_append_sheet(wb, sheet, "Timetable");
+    XLSX.writeFile(wb, "presento-timetable-template.xlsx");
+  };
+
+  const onTimetableFile = async (file: File) => {
+    const XLSX = await import("xlsx");
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      wb.Sheets[wb.SheetNames[0]],
+    );
+
+    const problems: string[] = [];
+    const rows = raw.flatMap((r, index) => {
+      const get = (...keys: string[]) => {
+        for (const k of Object.keys(r)) {
+          if (keys.includes(k.toLowerCase().trim().replace(/\s+/g, " "))) return r[k];
+        }
+        return undefined;
+      };
+      const line = index + 2;
+      const dayRaw = String(get("day", "day of week", "weekday") ?? "").trim();
+      const day = Number.isInteger(Number(dayRaw))
+        ? Number(dayRaw)
+        : DAY_LOOKUP[dayRaw.toLowerCase()];
+      const period = Number(get("period", "period no", "period number"));
+      const start = parseTime(get("start time", "start", "from", "start_time"));
+      const end = parseTime(get("end time", "end", "to", "end_time"));
+      const subject = String(get("subject") ?? "").trim();
+      const teacher = String(get("teacher", "faculty") ?? "").trim();
+      const department = String(get("department", "dept") ?? "").trim() || "General";
+      const semester = String(get("semester", "sem") ?? "").trim() || "1";
+      const section = String(get("section", "class", "classroom") ?? "").trim() || "A";
+
+      if (day == null || Number.isNaN(day) || day < 0 || day > 6) {
+        problems.push(`Row ${line}: invalid Day`);
+        return [];
+      }
+      if (!Number.isInteger(period) || period < 1 || period > 20) {
+        problems.push(`Row ${line}: invalid Period`);
+        return [];
+      }
+      if (!start || !end) {
+        problems.push(`Row ${line}: invalid Start/End Time`);
+        return [];
+      }
+      if (toMinutes(end) <= toMinutes(start)) {
+        problems.push(`Row ${line}: End Time must be after Start Time`);
+        return [];
+      }
+      if (!subject || !teacher) {
+        problems.push(`Row ${line}: Subject and Teacher are required`);
+        return [];
+      }
+      return [
+        {
+          day_of_week: day,
+          period,
+          start_time: start,
+          end_time: end,
+          subject: subject.slice(0, 120),
+          teacher: teacher.slice(0, 120),
+          department: department.slice(0, 120),
+          semester: semester.slice(0, 40),
+          section: section.slice(0, 40),
+        },
+      ];
+    });
+
+    if (rows.length === 0) {
+      toast.error(
+        problems[0] ?? "No valid rows found. Expected: Day, Period, Start Time, End Time, Subject, Teacher.",
+      );
+      return;
+    }
+    if (problems.length) {
+      toast.warning(`${problems.length} row(s) skipped: ${problems.slice(0, 3).join("; ")}`);
+    }
+    await run(
+      () => importTimetableFn({ data: { mode: ttMode, rows } }),
+      `Imported ${rows.length} periods`,
+    );
+  };
+
+
+
   return (
     <main className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
