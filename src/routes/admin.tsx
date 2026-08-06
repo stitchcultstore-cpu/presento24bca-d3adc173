@@ -135,10 +135,16 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const forceFn = useServerFn(setForcedRoll);
   const cycleFn = useServerFn(resetCycle);
   const reportFn = useServerFn(cycleReport);
+  const overrideFn = useServerFn(setOverrideDay);
+  const repeatFn = useServerFn(addRepeatEntry);
+  const importTimetableFn = useServerFn(importTimetable);
   const [downloading, setDownloading] = useState<number | null>(null);
+  const [ttMode, setTtMode] = useState<"replace" | "merge">("replace");
 
   const { data, refetch } = useQuery({ queryKey: ["admin-data"], queryFn: () => fetchAll() });
   const fileRef = useRef<HTMLInputElement>(null);
+  const ttFileRef = useRef<HTMLInputElement>(null);
+
 
   const cycleList: number[] = (() => {
     const set = new Set<number>(data?.cycles ?? []);
