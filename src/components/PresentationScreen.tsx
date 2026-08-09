@@ -82,9 +82,43 @@ export function PresentationScreen({
           <h1 className="text-[clamp(1.9rem,4.5vw,3.5rem)] font-semibold leading-tight">
             {student.name}
           </h1>
-          <p className="text-[clamp(1rem,2.2vw,1.6rem)] text-muted-foreground">
-            {student.topic || "Topic not provided"}
-          </p>
+          {student.topic ? (
+            <p className="text-[clamp(1rem,2.2vw,1.6rem)] text-muted-foreground">
+              {student.topic}
+            </p>
+          ) : (
+            <div className="w-full max-w-2xl">
+              <p className="text-sm text-muted-foreground">
+                No topic on record — type it below to continue.
+              </p>
+              <form
+                className="mt-3 flex flex-col items-center gap-3 sm:flex-row"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const value = topicDraft.trim();
+                  if (value.length < 2 || !onSaveTopic) return;
+                  onSaveTopic(value);
+                }}
+              >
+                <input
+                  value={topicDraft}
+                  onChange={(e) => setTopicDraft(e.target.value)}
+                  maxLength={300}
+                  placeholder="Enter presentation topic"
+                  aria-label="Presentation topic"
+                  className="h-12 w-full rounded-lg border-2 border-border bg-background px-4 text-lg text-foreground outline-none focus:border-primary"
+                />
+                <button
+                  type="submit"
+                  disabled={topicDraft.trim().length < 2 || savingTopic}
+                  className="inline-flex h-12 shrink-0 items-center gap-2 rounded-lg bg-primary px-6 text-lg font-semibold text-primary-foreground disabled:opacity-40"
+                >
+                  {savingTopic ? "Saving…" : "Save topic"}
+                </button>
+              </form>
+            </div>
+          )}
+
           <div className="flex flex-col items-center">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Roll number
