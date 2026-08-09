@@ -24,7 +24,36 @@ const reviewSchema = z.object({
   duration_seconds: z.number().int().min(0).max(36000).optional(),
 });
 
+const topicSchema = z.object({
+  roll_no: z.number().int().min(1).max(200),
+  topic: z.string().trim().min(2).max(300),
+  presentation_id: z.string().uuid().nullable().optional(),
+});
+
 const todayKey = () => new Date().toISOString().slice(0, 10);
+
+/** Lets a student type their topic on the spot when it is missing from the roster. */
+export const setStudentTopic = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => topicSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin
+      .from("students")
+      .update({ topic: data.topic })
+      .eq("roll_no", data.roll_no);
+    if (error) throw new Error(error.message);
+
+    if (data.presentation_id) {
+      await supabaseAdmin
+        .from("presentations")
+        .update({ topic: data.topic })
+        .eq("id", data.presentation_id);
+    }
+
+    return { ok: true as const, topic: data.topic };
+  });
+
 
 /** Everything the classroom app needs to render a session. */
 export const getSessionData = createServerFn({ method: "GET" }).handler(async () => {

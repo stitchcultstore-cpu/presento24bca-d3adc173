@@ -18,8 +18,10 @@ import {
   pickNextRoll,
   recordPresentation,
   saveAbsentees,
+  setStudentTopic,
   submitReview,
 } from "@/lib/presento.functions";
+
 import type { ReviewGrade } from "@/lib/review";
 
 import { parseAbsentRolls, resolveCurrentSession } from "@/lib/timetable";
@@ -93,6 +95,8 @@ function SessionPage() {
   const record = useServerFn(recordPresentation);
   const review = useServerFn(submitReview);
   const persistAbsent = useServerFn(saveAbsentees);
+  const saveTopicFn = useServerFn(setStudentTopic);
+
 
   const { data, refetch } = useQuery({
     queryKey: ["session-data"],
@@ -215,6 +219,23 @@ function SessionPage() {
     },
     onError: () => toast.error("Could not save the review."),
   });
+  const saveTopic = useMutation({
+    mutationFn: async (topic: string) =>
+      saveTopicFn({
+        data: {
+          roll_no: selected!.roll_no,
+          topic,
+          presentation_id: presentationId,
+        },
+      }),
+    onSuccess: async (result) => {
+      setSelected((prev) => (prev ? { ...prev, topic: result.topic } : prev));
+      toast.success("Topic saved");
+      await refetch();
+    },
+    onError: () => toast.error("Could not save the topic."),
+  });
+
 
   if (!entry) {
     return (
@@ -373,6 +394,9 @@ function SessionPage() {
           now={now}
           running={timerRunning}
           isRepeat={kind === "repeat"}
+          onSaveTopic={(topic) => saveTopic.mutate(topic)}
+          savingTopic={saveTopic.isPending}
+
           onComplete={(elapsedSeconds) => {
             setTimerRunning(false);
             setDurationSeconds(elapsedSeconds);
