@@ -18,8 +18,10 @@ import {
   pickNextRoll,
   recordPresentation,
   saveAbsentees,
+  setStudentTopic,
   submitReview,
 } from "@/lib/presento.functions";
+
 import type { ReviewGrade } from "@/lib/review";
 
 import { parseAbsentRolls, resolveCurrentSession } from "@/lib/timetable";
