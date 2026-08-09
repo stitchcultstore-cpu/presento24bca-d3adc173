@@ -20,6 +20,8 @@ export function PresentationScreen({
   running,
   onComplete,
   isRepeat,
+  onSaveTopic,
+  savingTopic = false,
 }: {
   student: PresentingStudent;
   subject: string;
@@ -29,12 +31,16 @@ export function PresentationScreen({
   running: boolean;
   onComplete: (elapsedSeconds: number) => void;
   isRepeat: boolean;
+  onSaveTopic?: (topic: string) => void;
+  savingTopic?: boolean;
 }) {
   const [started, setStarted] = useState(true);
   const [paused, setPaused] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
+  const [topicDraft, setTopicDraft] = useState("");
   const active = running && started && !paused;
   const elapsed = useRef(0);
+
 
   useEffect(() => {
     if (!active) return;
