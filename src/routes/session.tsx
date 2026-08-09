@@ -394,6 +394,9 @@ function SessionPage() {
           now={now}
           running={timerRunning}
           isRepeat={kind === "repeat"}
+          onSaveTopic={(topic) => saveTopic.mutate(topic)}
+          savingTopic={saveTopic.isPending}
+
           onComplete={(elapsedSeconds) => {
             setTimerRunning(false);
             setDurationSeconds(elapsedSeconds);
