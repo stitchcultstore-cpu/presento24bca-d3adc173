@@ -1,0 +1,1 @@
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS pick_weight integer NOT NULL DEFAULT 100;
