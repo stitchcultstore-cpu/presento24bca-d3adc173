@@ -34,7 +34,7 @@ export function PresentationScreen({
   onSaveTopic?: (topic: string) => void;
   savingTopic?: boolean;
 }) {
-  const [started, setStarted] = useState(true);
+  const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
   const [topicDraft, setTopicDraft] = useState("");
@@ -54,7 +54,7 @@ export function PresentationScreen({
     setTimerKey((k) => k + 1);
     elapsed.current = 0;
     setPaused(false);
-    setStarted(true);
+    setStarted(false);
   };
 
   const btn =

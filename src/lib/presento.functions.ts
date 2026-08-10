@@ -185,7 +185,26 @@ export const pickNextRoll = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "Every available student has presented." };
     }
 
+    // Weighted random pick: each student's pick_weight is their relative chance.
+    const defaultWeight = Number(
+      settings?.find((s) => s.key === "default_weight")?.value || "100",
+    );
+    const weightOf = (s: (typeof pool)[number]) => {
+      const w = (s as { pick_weight?: number | null }).pick_weight;
+      return Math.max(0, Number(w ?? defaultWeight));
+    };
+    const total = pool.reduce((sum, s) => sum + weightOf(s), 0);
     let chosen = pool[Math.floor(Math.random() * pool.length)];
+    if (total > 0) {
+      let ticket = Math.random() * total;
+      for (const s of pool) {
+        ticket -= weightOf(s);
+        if (ticket <= 0) {
+          chosen = s;
+          break;
+        }
+      }
+    }
     if (forced && pool.some((s) => s.roll_no === forced)) {
       chosen = pool.find((s) => s.roll_no === forced)!;
       await supabaseAdmin.from("app_settings").upsert({ key: "forced_roll", value: "" });

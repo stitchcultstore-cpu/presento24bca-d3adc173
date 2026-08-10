@@ -140,6 +140,7 @@ export type Database = {
           id: string
           name: string
           photo_url: string | null
+          pick_weight: number
           roll_no: number
           topic: string | null
         }
@@ -148,6 +149,7 @@ export type Database = {
           id?: string
           name: string
           photo_url?: string | null
+          pick_weight?: number
           roll_no: number
           topic?: string | null
         }
@@ -156,6 +158,7 @@ export type Database = {
           id?: string
           name?: string
           photo_url?: string | null
+          pick_weight?: number
           roll_no?: number
           topic?: string | null
         }

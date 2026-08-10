@@ -20,12 +20,16 @@ import {
   deleteRow,
   importStudents,
   importTimetable,
+  markPresented,
   resetCycle,
   saveNamed,
   saveStudent,
   saveTimetableEntry,
+  setDefaultWeight,
   setForcedRoll,
   setOverrideDay,
+  setStudentWeight,
+  unmarkPresented,
 } from "@/lib/admin.functions";
 import { DAY_NAMES, formatTime, toMinutes } from "@/lib/timetable";
 
@@ -138,6 +142,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const overrideFn = useServerFn(setOverrideDay);
   const repeatFn = useServerFn(addRepeatEntry);
   const importTimetableFn = useServerFn(importTimetable);
+  const markPresentedFn = useServerFn(markPresented);
+  const unmarkPresentedFn = useServerFn(unmarkPresented);
+  const setStudentWeightFn = useServerFn(setStudentWeight);
+  const setDefaultWeightFn = useServerFn(setDefaultWeight);
+  const [showPicking, setShowPicking] = useState(false);
   const [downloading, setDownloading] = useState<number | null>(null);
   const [ttMode, setTtMode] = useState<"replace" | "merge">("replace");
 
@@ -797,34 +806,209 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           </Panel>
 
-          <Panel title="Force next roll number">
+          <Panel title="Presented students (current cycle)">
             <p className="text-sm text-muted-foreground">
-              The wheel still spins normally, but lands on this roll number for the next pick.
-              Currently forced: <b className="text-foreground">{data?.forcedRoll || "none"}</b>
+              Add a student who already presented, or remove one so the wheel can select them
+              again. The wheel updates immediately.
             </p>
             <form
-              className="mt-4 flex gap-2"
+              className="mt-4 flex flex-wrap gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 const f = new FormData(e.currentTarget);
                 void run(
-                  () => forceFn({ data: { roll_no: Number(f.get("roll_no") || 0) } }),
-                  "Forced roll updated",
+                  () => markPresentedFn({ data: { roll_no: Number(f.get("roll_no")) } }),
+                  "Marked as presented",
                 );
                 e.currentTarget.reset();
               }}
             >
-              <Input name="roll_no" type="number" min={0} max={200} placeholder="Roll number" />
-              <Button type="submit">Set</Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => run(() => forceFn({ data: { roll_no: 0 } }), "Cleared")}
-              >
-                Clear
-              </Button>
+              <Input
+                name="roll_no"
+                type="number"
+                min={1}
+                max={200}
+                placeholder="Roll"
+                className="w-28"
+                required
+              />
+              <Button type="submit">Mark presented</Button>
             </form>
+            {(data?.presented ?? []).length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Nobody has presented in this cycle yet.
+              </p>
+            ) : (
+              <ul className="mt-4 max-h-64 overflow-auto text-sm">
+                {(data?.presented ?? []).map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between gap-3 border-b border-border py-2"
+                  >
+                    <span className="tabular-nums">
+                      {p.roll_no} · {p.name}
+                    </span>
+                    <button
+                      title="Remove from presented list"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() =>
+                        run(
+                          () => unmarkPresentedFn({ data: { roll_no: p.roll_no } }),
+                          "Removed — back in the wheel",
+                        )
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Panel>
+
+          <Panel title="Selection controls">
+            <p className="text-sm text-muted-foreground">
+              Advanced tools: force the next roll number and tune how likely each student is to
+              be called.
+            </p>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => setShowPicking((v) => !v)}
+            >
+              {showPicking ? "Hide selection controls" : "Show selection controls"}
+            </Button>
+
+            {showPicking ? (
+              <div className="mt-5 grid gap-5 lg:grid-cols-2">
+                <div className="rounded-lg border border-border p-4">
+                  <h4 className="text-sm font-medium">Force next roll number</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    The wheel still spins normally, but lands on this roll number for the next
+                    pick. Currently forced:{" "}
+                    <b className="text-foreground">{data?.forcedRoll || "none"}</b>
+                  </p>
+                  <form
+                    className="mt-4 flex flex-wrap gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const f = new FormData(e.currentTarget);
+                      void run(
+                        () => forceFn({ data: { roll_no: Number(f.get("roll_no") || 0) } }),
+                        "Forced roll updated",
+                      );
+                      e.currentTarget.reset();
+                    }}
+                  >
+                    <Input
+                      name="roll_no"
+                      type="number"
+                      min={0}
+                      max={200}
+                      placeholder="Roll number"
+                      className="w-36"
+                    />
+                    <Button type="submit">Set</Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => run(() => forceFn({ data: { roll_no: 0 } }), "Cleared")}
+                    >
+                      Clear
+                    </Button>
+                  </form>
+                </div>
+
+                <div className="rounded-lg border border-border p-4">
+                  <h4 className="text-sm font-medium">Chance of being called next</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Every student starts at the default chance. Raising a value makes that
+                    student more likely to be picked; 0 means never (until raised again).
+                  </p>
+                  <form
+                    className="mt-4 flex flex-wrap items-end gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const f = new FormData(e.currentTarget);
+                      void run(
+                        () =>
+                          setDefaultWeightFn({
+                            data: {
+                              weight: Number(f.get("weight") || 100),
+                              applyToAll: f.get("apply") === "on",
+                            },
+                          }),
+                        "Default chance saved",
+                      );
+                    }}
+                  >
+                    <div>
+                      <Label htmlFor="weight" className="text-xs">
+                        Default chance
+                      </Label>
+                      <Input
+                        id="weight"
+                        name="weight"
+                        type="number"
+                        min={1}
+                        max={1000}
+                        defaultValue={data?.defaultWeight ?? 100}
+                        className="w-32"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <input type="checkbox" name="apply" className="h-4 w-4" />
+                      Reset everyone
+                    </label>
+                    <Button type="submit">Save</Button>
+                  </form>
+
+                  <ul className="mt-4 max-h-72 overflow-auto text-sm">
+                    {(data?.students ?? []).map((s) => {
+                      const weight = s.pick_weight ?? data?.defaultWeight ?? 100;
+                      const total = (data?.students ?? []).reduce(
+                        (sum, x) => sum + (x.pick_weight ?? data?.defaultWeight ?? 100),
+                        0,
+                      );
+                      const share = total > 0 ? (weight / total) * 100 : 0;
+                      return (
+                        <li
+                          key={s.id}
+                          className="flex items-center justify-between gap-3 border-b border-border py-2"
+                        >
+                          <span className="truncate tabular-nums">
+                            {s.roll_no} · {s.name}
+                          </span>
+                          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                            {share.toFixed(1)}%
+                          </span>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={1000}
+                            defaultValue={weight}
+                            className="w-24 shrink-0"
+                            onBlur={(e) => {
+                              const next = Number(e.target.value);
+                              if (!Number.isFinite(next) || next === weight) return;
+                              void run(
+                                () =>
+                                  setStudentWeightFn({
+                                    data: { roll_no: s.roll_no, weight: next },
+                                  }),
+                                `Roll ${s.roll_no} chance updated`,
+                              );
+                            }}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            ) : null}
+          </Panel>
+
 
           <Panel title="Cycle reports">
             <p className="text-sm text-muted-foreground">
