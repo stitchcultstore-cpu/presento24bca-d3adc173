@@ -65,7 +65,7 @@ export const adminData = createServerFn({ method: "GET" }).handler(async () => {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100),
-      supabaseAdmin.from("presentations").select("cycle"),
+      supabaseAdmin.from("presentations").select("id, roll_no, student_name, cycle, kind"),
     ]);
   const setting = (key: string) =>
     settings.data?.find((s) => s.key === key)?.value ?? "";
@@ -89,7 +89,7 @@ export const adminData = createServerFn({ method: "GET" }).handler(async () => {
     forcedRoll: setting("forced_roll"),
     overrideDay: overrideRaw === "" ? null : Number(overrideRaw),
     defaultWeight: Number(setting("default_weight") || "100"),
-    presented: (history.data ?? [])
+    presented: (allCycles.data ?? [])
       .filter(
         (h) => h.cycle === Number(setting("current_cycle") || "1") && h.kind === "original",
       )
