@@ -20,12 +20,16 @@ import {
   deleteRow,
   importStudents,
   importTimetable,
+  markPresented,
   resetCycle,
   saveNamed,
   saveStudent,
   saveTimetableEntry,
+  setDefaultWeight,
   setForcedRoll,
   setOverrideDay,
+  setStudentWeight,
+  unmarkPresented,
 } from "@/lib/admin.functions";
 import { DAY_NAMES, formatTime, toMinutes } from "@/lib/timetable";
 
@@ -138,6 +142,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const overrideFn = useServerFn(setOverrideDay);
   const repeatFn = useServerFn(addRepeatEntry);
   const importTimetableFn = useServerFn(importTimetable);
+  const markPresentedFn = useServerFn(markPresented);
+  const unmarkPresentedFn = useServerFn(unmarkPresented);
+  const setStudentWeightFn = useServerFn(setStudentWeight);
+  const setDefaultWeightFn = useServerFn(setDefaultWeight);
+  const [showPicking, setShowPicking] = useState(false);
   const [downloading, setDownloading] = useState<number | null>(null);
   const [ttMode, setTtMode] = useState<"replace" | "merge">("replace");
 
