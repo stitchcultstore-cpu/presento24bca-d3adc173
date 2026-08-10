@@ -88,8 +88,125 @@ export const adminData = createServerFn({ method: "GET" }).handler(async () => {
     cycle: Number(setting("current_cycle") || "1"),
     forcedRoll: setting("forced_roll"),
     overrideDay: overrideRaw === "" ? null : Number(overrideRaw),
+    defaultWeight: Number(setting("default_weight") || "100"),
+    presented: (history.data ?? [])
+      .filter(
+        (h) => h.cycle === Number(setting("current_cycle") || "1") && h.kind === "original",
+      )
+      .map((h) => ({ id: h.id, roll_no: h.roll_no, name: h.student_name }))
+      .sort((a, b) => a.roll_no - b.roll_no),
   };
 });
+
+/** Marks a student as already presented in the current cycle (removes them from the wheel). */
+export const markPresented = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ roll_no: z.number().int().min(1).max(200) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: student } = await supabaseAdmin
+      .from("students")
+      .select("roll_no, name, topic")
+      .eq("roll_no", data.roll_no)
+      .maybeSingle();
+    if (!student) throw new Error(`Roll ${data.roll_no} is not on the roster`);
+
+    const { data: settings } = await supabaseAdmin
+      .from("app_settings")
+      .select("*")
+      .eq("key", "current_cycle")
+      .maybeSingle();
+    const cycle = Number(settings?.value ?? "1");
+
+    const { data: existing } = await supabaseAdmin
+      .from("presentations")
+      .select("id")
+      .eq("roll_no", data.roll_no)
+      .eq("cycle", cycle)
+      .eq("kind", "original")
+      .maybeSingle();
+    if (existing) throw new Error(`Roll ${data.roll_no} is already marked as presented`);
+
+    const { error } = await supabaseAdmin.from("presentations").insert({
+      roll_no: student.roll_no,
+      student_name: student.name,
+      topic: student.topic,
+      cycle,
+      kind: "original",
+      review: "Marked as completed by admin",
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Removes a student from the presented list for the current cycle (back into the wheel). */
+export const unmarkPresented = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ roll_no: z.number().int().min(1).max(200) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: settings } = await supabaseAdmin
+      .from("app_settings")
+      .select("*")
+      .eq("key", "current_cycle")
+      .maybeSingle();
+    const cycle = Number(settings?.value ?? "1");
+    const { error } = await supabaseAdmin
+      .from("presentations")
+      .delete()
+      .eq("roll_no", data.roll_no)
+      .eq("cycle", cycle);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Sets how likely a single student is to be picked next (100 = normal). */
+export const setStudentWeight = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        roll_no: z.number().int().min(1).max(200),
+        weight: z.number().int().min(0).max(1000),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("students")
+      .update({ pick_weight: data.weight })
+      .eq("roll_no", data.roll_no);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Default chance applied to every student, and optionally resets everyone to it. */
+export const setDefaultWeight = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({ weight: z.number().int().min(1).max(1000), applyToAll: z.boolean() })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await requireAdmin();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("app_settings")
+      .upsert({ key: "default_weight", value: String(data.weight) });
+    if (data.applyToAll) {
+      const { error } = await supabaseAdmin
+        .from("students")
+        .update({ pick_weight: data.weight })
+        .gte("roll_no", 0);
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });
 
 /** Makes the app behave as another weekday (e.g. Monday's timetable on a Saturday). */
 export const setOverrideDay = createServerFn({ method: "POST" })
