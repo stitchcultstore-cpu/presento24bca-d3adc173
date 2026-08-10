@@ -54,7 +54,7 @@ export function PresentationScreen({
     setTimerKey((k) => k + 1);
     elapsed.current = 0;
     setPaused(false);
-    setStarted(true);
+    setStarted(false);
   };
 
   const btn =
