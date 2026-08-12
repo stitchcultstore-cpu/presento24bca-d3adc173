@@ -85,7 +85,9 @@ export function PresentationWheel({
           "absolute inset-0 origin-center",
           phase === "fast" && "animate-[spin_0.65s_linear_infinite]",
           phase === "landing" &&
-            "transition-transform duration-[3200ms] ease-[cubic-bezier(0.05,0.72,0.02,1)]",
+            "transition-transform duration-[5200ms] ease-[cubic-bezier(0.08,0.55,0.02,1)]",
+          phase === "settle" &&
+            "transition-transform duration-[1100ms] ease-[cubic-bezier(0.22,1,0.3,1)]",
           phase === "idle" && "transition-transform duration-500",
         )}
         style={phase === "fast" ? undefined : { transform: `rotate(${landAngle}deg)` }}
