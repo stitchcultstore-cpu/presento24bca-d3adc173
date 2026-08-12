@@ -186,7 +186,7 @@ function SessionPage() {
           setStage("screen");
           setTimerRunning(true);
         }, 1800);
-      }, 7600);
+      }, 4400);
     },
     onError: () => toast.error("Could not select a roll number."),
   });

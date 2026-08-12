@@ -1,5 +1,3 @@
-import { useEffect, useRef, useState } from "react";
-
 import { cn } from "@/lib/utils";
 
 export type RollState = "available" | "presented" | "absent" | "selected";
@@ -26,50 +24,8 @@ export function PresentationWheel({
   const count = rolls.length || 1;
   const step = 360 / count;
   const targetIndex = target ? rolls.indexOf(target) : -1;
-
-  const needleRef = useRef<HTMLDivElement>(null);
-  const [phase, setPhase] = useState<"idle" | "fast" | "landing" | "settle">("idle");
-  const [landAngle, setLandAngle] = useState(0);
-
-  // Phase 1: free, fast, constant-speed spin. Phase 2: long, gradual deceleration
-  // that crawls past the last few numbers. Phase 3: a tiny settle so it never
-  // stops abruptly.
-  useEffect(() => {
-    if (!spinning) {
-      if (!revealed) {
-        setPhase("idle");
-        setLandAngle(0);
-      }
-      return;
-    }
-    setPhase("fast");
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(
-      setTimeout(() => {
-        const el = needleRef.current;
-        let base = 0;
-        if (el) {
-          const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
-          base = (((Math.atan2(m.b, m.a) * 180) / Math.PI) + 360) % 360;
-        }
-        const wanted = targetIndex >= 0 ? targetIndex * step : 0;
-        const delta = ((wanted - base) % 360 + 360) % 360;
-        // stop a hair short, then creep the last bit during the settle phase
-        const finalAngle = base + 360 * 5 + delta;
-        setLandAngle(finalAngle - step * 0.35);
-        setPhase("landing");
-        timers.push(
-          setTimeout(() => {
-            setLandAngle(finalAngle);
-            setPhase("settle");
-          }, 5200),
-        );
-      }, 1200),
-    );
-    return () => timers.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spinning, targetIndex, step]);
-
+  const needleAngle =
+    targetIndex >= 0 ? 360 * 6 + targetIndex * step : spinning ? 360 * 6 : 0;
 
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[520px]">
@@ -80,21 +36,11 @@ export function PresentationWheel({
         )}
       />
       <div
-        ref={needleRef}
-        className={cn(
-          "absolute inset-0 origin-center",
-          phase === "fast" && "animate-[spin_0.65s_linear_infinite]",
-          phase === "landing" &&
-            "transition-transform duration-[5200ms] ease-[cubic-bezier(0.08,0.55,0.02,1)]",
-          phase === "settle" &&
-            "transition-transform duration-[1100ms] ease-[cubic-bezier(0.22,1,0.3,1)]",
-          phase === "idle" && "transition-transform duration-500",
-        )}
-        style={phase === "fast" ? undefined : { transform: `rotate(${landAngle}deg)` }}
+        className="absolute inset-0 origin-center transition-transform duration-[4200ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
+        style={{ transform: `rotate(${needleAngle}deg)` }}
       >
         <div className="absolute left-1/2 top-1/2 h-[42%] w-[3px] -translate-x-1/2 -translate-y-full rounded-full bg-primary" />
       </div>
-
       <div
         className={cn(
           "absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-card text-center transition-all duration-500",
