@@ -28,11 +28,12 @@ export function PresentationWheel({
   const targetIndex = target ? rolls.indexOf(target) : -1;
 
   const needleRef = useRef<HTMLDivElement>(null);
-  const [phase, setPhase] = useState<"idle" | "fast" | "landing">("idle");
+  const [phase, setPhase] = useState<"idle" | "fast" | "landing" | "settle">("idle");
   const [landAngle, setLandAngle] = useState(0);
 
-  // Phase 1: free, fast, constant-speed spin. Phase 2: long dramatic deceleration
-  // that ends exactly on the selected roll number.
+  // Phase 1: free, fast, constant-speed spin. Phase 2: long, gradual deceleration
+  // that crawls past the last few numbers. Phase 3: a tiny settle so it never
+  // stops abruptly.
   useEffect(() => {
     if (!spinning) {
       if (!revealed) {
@@ -42,21 +43,33 @@ export function PresentationWheel({
       return;
     }
     setPhase("fast");
-    const t = setTimeout(() => {
-      const el = needleRef.current;
-      let base = 0;
-      if (el) {
-        const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
-        base = (((Math.atan2(m.b, m.a) * 180) / Math.PI) + 360) % 360;
-      }
-      const wanted = targetIndex >= 0 ? targetIndex * step : 0;
-      const delta = ((wanted - base) % 360 + 360) % 360;
-      setLandAngle(base + 360 * 4 + delta);
-      setPhase("landing");
-    }, 1200);
-    return () => clearTimeout(t);
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    timers.push(
+      setTimeout(() => {
+        const el = needleRef.current;
+        let base = 0;
+        if (el) {
+          const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+          base = (((Math.atan2(m.b, m.a) * 180) / Math.PI) + 360) % 360;
+        }
+        const wanted = targetIndex >= 0 ? targetIndex * step : 0;
+        const delta = ((wanted - base) % 360 + 360) % 360;
+        // stop a hair short, then creep the last bit during the settle phase
+        const finalAngle = base + 360 * 5 + delta;
+        setLandAngle(finalAngle - step * 0.35);
+        setPhase("landing");
+        timers.push(
+          setTimeout(() => {
+            setLandAngle(finalAngle);
+            setPhase("settle");
+          }, 5200),
+        );
+      }, 1200),
+    );
+    return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spinning, targetIndex, step]);
+
 
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[520px]">
