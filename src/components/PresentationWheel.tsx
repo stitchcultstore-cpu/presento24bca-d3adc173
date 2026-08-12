@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import { cn } from "@/lib/utils";
 
 export type RollState = "available" | "presented" | "absent" | "selected";
@@ -24,8 +26,37 @@ export function PresentationWheel({
   const count = rolls.length || 1;
   const step = 360 / count;
   const targetIndex = target ? rolls.indexOf(target) : -1;
-  const needleAngle =
-    targetIndex >= 0 ? 360 * 6 + targetIndex * step : spinning ? 360 * 6 : 0;
+
+  const needleRef = useRef<HTMLDivElement>(null);
+  const [phase, setPhase] = useState<"idle" | "fast" | "landing">("idle");
+  const [landAngle, setLandAngle] = useState(0);
+
+  // Phase 1: free, fast, constant-speed spin. Phase 2: long dramatic deceleration
+  // that ends exactly on the selected roll number.
+  useEffect(() => {
+    if (!spinning) {
+      if (!revealed) {
+        setPhase("idle");
+        setLandAngle(0);
+      }
+      return;
+    }
+    setPhase("fast");
+    const t = setTimeout(() => {
+      const el = needleRef.current;
+      let base = 0;
+      if (el) {
+        const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+        base = (((Math.atan2(m.b, m.a) * 180) / Math.PI) + 360) % 360;
+      }
+      const wanted = targetIndex >= 0 ? targetIndex * step : 0;
+      const delta = ((wanted - base) % 360 + 360) % 360;
+      setLandAngle(base + 360 * 4 + delta);
+      setPhase("landing");
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spinning, targetIndex, step]);
 
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[520px]">
@@ -36,11 +67,19 @@ export function PresentationWheel({
         )}
       />
       <div
-        className="absolute inset-0 origin-center transition-transform duration-[4200ms] ease-[cubic-bezier(0.16,1,0.3,1)]"
-        style={{ transform: `rotate(${needleAngle}deg)` }}
+        ref={needleRef}
+        className={cn(
+          "absolute inset-0 origin-center",
+          phase === "fast" && "animate-[spin_0.65s_linear_infinite]",
+          phase === "landing" &&
+            "transition-transform duration-[3200ms] ease-[cubic-bezier(0.05,0.72,0.02,1)]",
+          phase === "idle" && "transition-transform duration-500",
+        )}
+        style={phase === "fast" ? undefined : { transform: `rotate(${landAngle}deg)` }}
       >
         <div className="absolute left-1/2 top-1/2 h-[42%] w-[3px] -translate-x-1/2 -translate-y-full rounded-full bg-primary" />
       </div>
+
       <div
         className={cn(
           "absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-card text-center transition-all duration-500",
