@@ -53,27 +53,37 @@ function RollList({
   title,
   empty,
   rows,
+  action,
 }: {
   title: string;
   empty: string;
   rows: { roll_no: number; name: string }[];
+  action?: (row: { roll_no: number; name: string }) => React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-medium">{title}</h2>
-        <span className="text-xs tabular-nums text-muted-foreground">{rows.length}</span>
+    <div className="rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="min-w-0 truncate text-sm font-medium">{title}</h2>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+          {rows.length}
+        </span>
       </div>
       {rows.length === 0 ? (
         <p className="mt-2 text-xs text-muted-foreground">{empty}</p>
       ) : (
         <ul className="mt-3 max-h-56 space-y-1.5 overflow-auto text-sm">
           {rows.map((r) => (
-            <li key={r.roll_no} className="flex gap-2 border-b border-border pb-1.5">
-              <span className="w-7 shrink-0 tabular-nums text-muted-foreground">
-                {r.roll_no}
+            <li
+              key={r.roll_no}
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border pb-1.5"
+            >
+              <span className="flex min-w-0 gap-2">
+                <span className="w-7 shrink-0 tabular-nums text-muted-foreground">
+                  {r.roll_no}
+                </span>
+                <span className="truncate">{r.name}</span>
               </span>
-              <span className="truncate">{r.name}</span>
+              {action ? <span className="shrink-0">{action(r)}</span> : null}
             </li>
           ))}
         </ul>
