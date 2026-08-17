@@ -12,7 +12,8 @@ type Props = {
   revealed?: boolean;
 };
 
-const RADIUS = 210;
+/** Radius as a percentage of the wheel box so it scales on every screen size. */
+const RADIUS_PCT = 40.5;
 
 export function PresentationWheel({
   rolls,
