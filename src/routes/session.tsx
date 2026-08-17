@@ -246,6 +246,46 @@ function SessionPage() {
     onError: () => toast.error("Could not save the topic."),
   });
 
+  // Lets a teacher run a queued re-presentation immediately, skipping the wheel.
+  const presentNow = useMutation({
+    mutationFn: async (roll: number) => {
+      const student = (data?.students ?? []).find((s) => s.roll_no === roll);
+      const isRepeat = (data?.repeatQueue ?? []).includes(roll);
+      const created = await record({
+        data: {
+          roll_no: roll,
+          kind: isRepeat ? "repeat" : "original",
+          cycle: data?.cycle ?? 1,
+          subject: entry?.subject ?? null,
+          teacher: entry?.teacher ?? null,
+          period: entry?.period ?? null,
+        },
+      });
+      return {
+        id: created.id,
+        isRepeat,
+        student: {
+          roll_no: roll,
+          name: student?.name ?? `Roll ${roll}`,
+          topic: student?.topic ?? null,
+          photo_url: student?.photo_url ?? null,
+        },
+      };
+    },
+    onSuccess: (result) => {
+      setKind(result.isRepeat ? "repeat" : "original");
+      setSelected(result.student);
+      setRevealed(true);
+      setSpinning(false);
+      setPresentationId(result.id);
+      setStage("screen");
+      setTimerRunning(true);
+    },
+    onError: () => toast.error("Could not start that presentation."),
+  });
+
+
+
 
   if (!entry) {
     return (
