@@ -44,14 +44,14 @@ export function PresentationWheel({
       </div>
       <div
         className={cn(
-          "absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-card text-center transition-all duration-500",
+          "absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-card text-center transition-all duration-500 sm:h-20 sm:w-20",
           revealed
             ? "scale-110 border-primary bg-primary text-primary-foreground"
             : "border-border",
         )}
       >
         {revealed ? (
-          <span className="animate-scale-in text-2xl font-semibold tabular-nums">
+          <span className="animate-scale-in text-xl font-semibold tabular-nums sm:text-2xl">
             {target}
           </span>
         ) : spinning ? (
@@ -61,7 +61,7 @@ export function PresentationWheel({
             <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" />
           </span>
         ) : (
-          <span className="text-2xl font-semibold text-muted-foreground">—</span>
+          <span className="text-xl font-semibold text-muted-foreground sm:text-2xl">—</span>
         )}
       </div>
 
@@ -72,7 +72,7 @@ export function PresentationWheel({
           <div
             key={roll}
             className={cn(
-              "absolute flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-xs font-medium tabular-nums transition-all duration-300",
+              "absolute flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-[10px] font-medium tabular-nums transition-all duration-300 sm:h-9 sm:w-9 sm:text-xs",
               state === "available" && "border-border bg-card text-foreground",
               state === "presented" &&
                 "border-border bg-muted text-muted-foreground line-through opacity-60",
@@ -83,8 +83,8 @@ export function PresentationWheel({
               spinning && "opacity-70",
             )}
             style={{
-              left: `calc(50% + ${Math.cos(angle) * RADIUS}px)`,
-              top: `calc(50% + ${Math.sin(angle) * RADIUS}px)`,
+              left: `calc(50% + ${(Math.cos(angle) * RADIUS_PCT).toFixed(3)}%)`,
+              top: `calc(50% + ${(Math.sin(angle) * RADIUS_PCT).toFixed(3)}%)`,
             }}
           >
             {roll}
