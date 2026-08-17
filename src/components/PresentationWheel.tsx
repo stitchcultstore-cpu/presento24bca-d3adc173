@@ -29,7 +29,7 @@ export function PresentationWheel({
     targetIndex >= 0 ? 360 * 6 + targetIndex * step : spinning ? 360 * 6 : 0;
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[520px]">
+    <div className="relative mx-auto aspect-square w-full max-w-[min(90vw,520px)]">
       <div
         className={cn(
           "absolute inset-6 rounded-full border border-border bg-card shadow-[var(--shadow-card)] transition-shadow duration-500",
